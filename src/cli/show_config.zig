@@ -19,6 +19,9 @@ pub const Options = struct {
     /// if available.
     docs: bool = false,
 
+    /// If true print where each option was set above it as a comment.
+    sources: bool = false,
+
     /// Disable automatic paging of output.
     @"no-pager": bool = false,
 
@@ -61,6 +64,8 @@ pub const Options = struct {
 ///     This is very noisy but is very useful to learn about available
 ///     options, especially paired with `--default`.
 ///
+///   * `--sources`: Print where each option was set above it.
+///
 ///   * `--no-pager`: Disable automatic paging of output.
 pub fn run(alloc: Allocator) !u8 {
     var opts: Options = .{};
@@ -80,6 +85,7 @@ pub fn run(alloc: Allocator) !u8 {
         .config = &config,
         .changed = !opts.default and opts.@"changes-only",
         .docs = opts.docs,
+        .sources = opts.sources,
     };
 
     var pager: Pager = if (!opts.@"no-pager") .init() else .{};

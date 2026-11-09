@@ -22,6 +22,9 @@ pub const FileFormatter = struct {
     /// Only include changed values from the default.
     changed: bool = false,
 
+    /// Include a comment above each entry saying where it was set.
+    sources: bool = false,
+
     /// Implements std.fmt so it can be used directly with std.fmt.
     pub fn format(
         self: FileFormatter,
@@ -55,6 +58,13 @@ pub const FileFormatter = struct {
                         try writer.print("# {s}\n", .{line});
                     }
                 }
+
+                if (self.sources) if (self.config.sourceOf(@field(Key, field))) |src| switch (src) {
+                    .file => |l| try writer.print("# set in {s}:{d}\n", .{ l.path, l.line }),
+                    .theme => |l| try writer.print("# set by theme {s}:{d}\n", .{ l.path, l.line }),
+                    .cli => |n| try writer.print("# set by CLI argument {d}\n", .{n}),
+                    .other => {},
+                };
 
                 formatter.formatEntry(
                     field_type,
@@ -107,4 +117,32 @@ test "format default config changed" {
     try fmt.format(&buf.writer);
 
     //std.log.warn("{s}", .{buf.written()});
+}
+
+test "format sources" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    cfg.@"font-size" = 14;
+    try cfg._sources.put(cfg._arena.?.allocator(), "font-size", .{
+        .file = .{ .path = "/x/config.ghostty", .line = 3 },
+    });
+
+    var buf: std.Io.Writer.Allocating = .init(alloc);
+    defer buf.deinit();
+
+    const fmt: FileFormatter = .{
+        .alloc = alloc,
+        .config = &cfg,
+        .changed = true,
+        .sources = true,
+    };
+    try fmt.format(&buf.writer);
+
+    try testing.expect(std.mem.indexOf(
+        u8,
+        buf.written(),
+        "# set in /x/config.ghostty:3\nfont-size = 14\n",
+    ) != null);
 }
