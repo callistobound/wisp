@@ -50,6 +50,8 @@ pub const Error = error{
 /// the old values would NOT error, then the caller should handle that
 /// downstream after parsing is done, not through this method.
 ///
+/// If T has `parsedFieldHook`, it is called after each field is set.
+///
 /// Note: If the arena is already non-null, then it will be used. In this
 /// case, in the case of an error some memory might be leaked into the arena.
 pub fn parse(

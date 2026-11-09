@@ -4982,7 +4982,7 @@ pub fn finalize(self: *Config) !void {
     self.@"key-remap".finalize();
 }
 
-/// Returns where the key was last set, or null if it is still the default.
+/// Returns where the key was last set, or null if no config line set it.
 pub fn sourceOf(self: *const Config, key: Key) ?Source {
     return self._sources.get(@tagName(key));
 }
@@ -5565,12 +5565,15 @@ const Replay = struct {
 
                     .location => |v| self.loc = v,
                     .arg => |arg| return arg,
-                    .@"-e" => return "-e",
+                    .@"-e" => {
+                        self.loc = .none;
+                        return "-e";
+                    },
                 }
             }
         }
 
-        /// Returns the location of the last arg, cloned into alloc.
+        /// Returns the location from the most recent `.location` step, cloned into alloc.
         pub fn location(
             self: *const Self,
             alloc: Allocator,
@@ -11606,6 +11609,23 @@ test "source: iterator without location records other" {
     try cfg.finalize();
 
     try testing.expect(cfg.sourceOf(.@"font-size").? == .other);
+}
+
+test "source: replay -e clears location" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    const steps: []const Replay.Step = &.{
+        .{ .location = .{ .file = .{ .path = "/x/config.ghostty", .line = 1 } } },
+        .{ .arg = "--font-size=14" },
+        .@"-e",
+    };
+    var it = Replay.iterator(steps, &cfg);
+    try testing.expectEqualStrings("--font-size=14", it.next().?);
+    try testing.expectEqualStrings("-e", it.next().?);
+    try testing.expect((try it.location(cfg._arena.?.allocator())).? == .none);
 }
 
 test "source: theme value reports theme" {

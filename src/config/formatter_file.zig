@@ -59,12 +59,14 @@ pub const FileFormatter = struct {
                     }
                 }
 
-                if (self.sources) if (self.config.sourceOf(@field(Key, field))) |src| switch (src) {
-                    .file => |l| try writer.print("# set in {s}:{d}\n", .{ l.path, l.line }),
-                    .theme => |l| try writer.print("# set by theme {s}:{d}\n", .{ l.path, l.line }),
-                    .cli => |n| try writer.print("# set by CLI argument {d}\n", .{n}),
-                    .other => {},
-                };
+                if (self.sources) {
+                    if (self.config.sourceOf(@field(Key, field))) |src| switch (src) {
+                        .file => |l| try writer.print("# set in {s}:{d}\n", .{ l.path, l.line }),
+                        .theme => |l| try writer.print("# set by theme {s}:{d}\n", .{ l.path, l.line }),
+                        .cli => |n| try writer.print("# set by CLI argument {d}\n", .{n}),
+                        .other => {},
+                    };
+                }
 
                 formatter.formatEntry(
                     field_type,
@@ -145,4 +147,53 @@ test "format sources" {
         buf.written(),
         "# set in /x/config.ghostty:3\nfont-size = 14\n",
     ) != null);
+}
+
+test "format sources theme, cli, and docs" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    const arena_alloc = cfg._arena.?.allocator();
+    cfg.@"font-size" = 14;
+    try cfg._sources.put(arena_alloc, "font-size", .{
+        .theme = .{ .path = "/x/themes/t", .line = 5 },
+    });
+    cfg.@"font-thicken" = true;
+    try cfg._sources.put(arena_alloc, "font-thicken", .{ .cli = 2 });
+
+    var buf: std.Io.Writer.Allocating = .init(alloc);
+    defer buf.deinit();
+
+    const fmt: FileFormatter = .{
+        .alloc = alloc,
+        .config = &cfg,
+        .changed = true,
+        .sources = true,
+        .docs = true,
+    };
+    try fmt.format(&buf.writer);
+    const out = buf.written();
+
+    try testing.expect(std.mem.indexOf(
+        u8,
+        out,
+        "# set by theme /x/themes/t:5\nfont-size = 14\n",
+    ) != null);
+    try testing.expect(std.mem.indexOf(
+        u8,
+        out,
+        "# set by CLI argument 2\nfont-thicken = true\n",
+    ) != null);
+
+    // Docs come first, then the source line directly above the entry.
+    const help = help_strings.Config.@"font-size";
+    const last = help[(std.mem.lastIndexOfScalar(u8, help, '\n') orelse 0) + 1 ..];
+    const expected = try std.fmt.allocPrint(
+        alloc,
+        "# {s}\n# set by theme /x/themes/t:5\nfont-size = 14\n",
+        .{last},
+    );
+    defer alloc.free(expected);
+    try testing.expect(std.mem.indexOf(u8, out, expected) != null);
 }

@@ -19,13 +19,11 @@ pub const Source = union(enum) {
         return switch (loc) {
             .none => .other,
             .cli => |n| .{ .cli = n },
-            .file => |f| if (theme_path) |tp|
-                if (std.mem.eql(u8, tp, f.path))
-                    .{ .theme = .{ .path = f.path, .line = f.line } }
-                else
-                    .{ .file = .{ .path = f.path, .line = f.line } }
-            else
-                .{ .file = .{ .path = f.path, .line = f.line } },
+            .file => |f| file: {
+                const l: Line = .{ .path = f.path, .line = f.line };
+                const is_theme = if (theme_path) |tp| std.mem.eql(u8, tp, f.path) else false;
+                break :file if (is_theme) .{ .theme = l } else .{ .file = l };
+            },
         };
     }
 
