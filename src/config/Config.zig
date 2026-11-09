@@ -4694,6 +4694,7 @@ fn loadTheme(self: *Config, theme: Theme) !void {
     const alloc_gpa = self._arena.?.child_allocator;
     var new_config = try self.cloneEmpty(alloc_gpa);
     errdefer new_config.deinit();
+    new_config._theme_path = try new_config._arena.?.allocator().dupe(u8, path);
 
     // Load our theme
     var buf: [2048]u8 = undefined;
@@ -4705,7 +4706,7 @@ fn loadTheme(self: *Config, theme: Theme) !void {
     // Setup our replay to be conditional.
     conditional: for (new_config._replay_steps.items) |*item| {
         switch (item.*) {
-            .expand, .diagnostic => {},
+            .expand, .location, .diagnostic => {},
 
             // If we see "-e" then we do NOT make the following arguments
             // conditional since they are supposed to be part of the
@@ -5036,7 +5037,11 @@ pub fn parseManuallyHook(
         return false;
     }
 
-    // Keep track of our input args for replay
+    // Keep track of our input args (and their location) for replay
+    try self._replay_steps.append(
+        alloc,
+        .{ .location = try cli.Location.fromIter(iter, alloc) },
+    );
     try self._replay_steps.append(
         alloc,
         .{ .arg = try alloc.dupeSentinel(u8, arg, 0) },
@@ -5269,6 +5274,15 @@ pub fn clone(
     // Copy the conditional set
     result._conditional_set = self._conditional_set;
 
+    // Copy our sources. Keys are static tag names.
+    try result._sources.ensureTotalCapacity(alloc_arena, self._sources.count());
+    var sources_it = self._sources.iterator();
+    while (sources_it.next()) |entry| result._sources.putAssumeCapacity(
+        entry.key_ptr.*,
+        try entry.value_ptr.clone(alloc_arena),
+    );
+    if (self._theme_path) |v| result._theme_path = try alloc_arena.dupe(u8, v);
+
     return result;
 }
 
@@ -5418,6 +5432,9 @@ const Replay = struct {
         /// A base path to expand relative paths against.
         expand: []const u8,
 
+        /// The location of the following arg, reported by the iterator.
+        location: cli.Location,
+
         /// A conditional argument. This arg is parsed only if all
         /// conditions match (an "AND"). An "OR" can be achieved by
         /// having multiple conditional arg entries.
@@ -5455,6 +5472,7 @@ const Replay = struct {
                 .diagnostic => |v| .{ .diagnostic = try v.clone(alloc) },
                 .arg => |v| .{ .arg = try alloc.dupeSentinel(u8, v, 0) },
                 .expand => |v| .{ .expand = try alloc.dupe(u8, v) },
+                .location => |v| .{ .location = try v.clone(alloc) },
                 .conditional_arg => |v| conditional: {
                     var conds = try alloc.alloc(Conditional, v.conditions.len);
                     for (v.conditions, 0..) |cond, i| conds[i] = try cond.clone(alloc);
@@ -5473,6 +5491,7 @@ const Replay = struct {
         config: *Config,
         slice: []const Replay.Step,
         idx: usize = 0,
+        loc: cli.Location = .none,
 
         pub fn next(self: *Self) ?[]const u8 {
             while (true) {
@@ -5513,10 +5532,19 @@ const Replay = struct {
                         return v.arg;
                     },
 
+                    .location => |v| self.loc = v,
                     .arg => |arg| return arg,
                     .@"-e" => return "-e",
                 }
             }
+        }
+
+        /// Returns the location of the last arg, cloned into alloc.
+        pub fn location(
+            self: *const Self,
+            alloc: Allocator,
+        ) Allocator.Error!?cli.Location {
+            return try self.loc.clone(alloc);
         }
     };
 
@@ -11489,4 +11517,122 @@ test "source: iterator without location records other" {
     try cfg.finalize();
 
     try testing.expect(cfg.sourceOf(.@"font-size").? == .other);
+}
+
+test "source: theme value reports theme" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var arena = ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const alloc_arena = arena.allocator();
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    var buf: [4096]u8 = undefined;
+    {
+        var file = try td.dir.createFile(testing.io, "theme", .{});
+        defer file.close(testing.io);
+        var writer = file.writer(testing.io, &buf);
+        try writer.interface.writeAll(@embedFile("testdata/theme_simple"));
+        try writer.end();
+    }
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = path_buf[0..try td.dir.realPathFile(testing.io, "theme", &path_buf)];
+
+    var reader: std.Io.Reader = .fixed(try alloc_arena.print("theme = {s}\n", .{path}));
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, "/home/ghostty/.config/ghostty/config.ghostty");
+    try cfg.finalize();
+
+    const s = cfg.sourceOf(.background).?;
+    try testing.expect(s == .theme);
+    try testing.expectEqualStrings(path, s.theme.path);
+    try testing.expectEqual(@as(usize, 2), s.theme.line);
+    try testing.expect(cfg.sourceOf(.theme).? == .file);
+}
+
+test "source: config overrides theme source" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var arena = ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const alloc_arena = arena.allocator();
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    var buf: [4096]u8 = undefined;
+    {
+        var file = try td.dir.createFile(testing.io, "theme", .{});
+        defer file.close(testing.io);
+        var writer = file.writer(testing.io, &buf);
+        try writer.interface.writeAll(@embedFile("testdata/theme_simple"));
+        try writer.end();
+    }
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = path_buf[0..try td.dir.realPathFile(testing.io, "theme", &path_buf)];
+
+    const config_path = "/home/ghostty/.config/ghostty/config.ghostty";
+    var reader: std.Io.Reader = .fixed(try alloc_arena.print(
+        "theme = {s}\nbackground = #ABCDEF\n",
+        .{path},
+    ));
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, config_path);
+    try cfg.finalize();
+
+    const s = cfg.sourceOf(.background).?;
+    try testing.expectEqualStrings(config_path, s.file.path);
+    try testing.expectEqual(@as(usize, 2), s.file.line);
+}
+
+test "source: survives changeConditionalState and clone" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    var arena = ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const alloc_arena = arena.allocator();
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    var buf: [4096]u8 = undefined;
+    {
+        var file = try td.dir.createFile(testing.io, "theme_light", .{});
+        defer file.close(testing.io);
+        var writer = file.writer(testing.io, &buf);
+        try writer.interface.writeAll(@embedFile("testdata/theme_light"));
+        try writer.end();
+    }
+    {
+        var file = try td.dir.createFile(testing.io, "theme_dark", .{});
+        defer file.close(testing.io);
+        var writer = file.writer(testing.io, &buf);
+        try writer.interface.writeAll(@embedFile("testdata/theme_dark"));
+        try writer.end();
+    }
+    var light_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const light = light_buf[0..try td.dir.realPathFile(testing.io, "theme_light", &light_buf)];
+    var dark_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dark = dark_buf[0..try td.dir.realPathFile(testing.io, "theme_dark", &dark_buf)];
+
+    const config_path = "/home/ghostty/.config/ghostty/config.ghostty";
+    var reader: std.Io.Reader = .fixed(try alloc_arena.print(
+        "theme = light:{s},dark:{s}\nfont-size = 14\n",
+        .{ light, dark },
+    ));
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, config_path);
+    try cfg.finalize();
+
+    var cfg_dark = (try cfg.changeConditionalState(.{ .theme = .dark })).?;
+    defer cfg_dark.deinit();
+    var cfg_clone = try cfg_dark.clone(alloc);
+    defer cfg_clone.deinit();
+
+    const fs = cfg_clone.sourceOf(.@"font-size").?;
+    try testing.expectEqualStrings(config_path, fs.file.path);
+    try testing.expectEqual(@as(usize, 2), fs.file.line);
+    try testing.expectEqualStrings(dark, cfg_clone.sourceOf(.background).?.theme.path);
 }
