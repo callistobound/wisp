@@ -42,6 +42,7 @@ const KeyRemapSet = @import("../input/key_mods.zig").RemapSet;
 pub const WindowPaddingBalance = @import("../renderer/size.zig").PaddingBalance;
 const string = @import("string.zig");
 const Limit = @import("limit.zig").Limit;
+const Source = @import("source.zig").Source;
 
 // We do this instead of importing all of terminal/main.zig to
 // limit the dependency graph. This is important because some things
@@ -4037,6 +4038,13 @@ _conditional_set: std.EnumSet(conditional.Key) = .{},
 /// as loadTheme which has more details on why.
 _replay_steps: std.ArrayList(Replay.Step) = .empty,
 
+/// Where each key was last set, by key name. Absent means the default.
+/// This can't be an EnumMap(Key, _) since Key is derived from our fields.
+_sources: std.StringHashMapUnmanaged(Source) = .empty,
+
+/// Path of the theme file being loaded, so its values record as `.theme`.
+_theme_path: ?[]const u8 = null,
+
 /// Set to true if Ghostty was executed as xdg-terminal-exec on Linux.
 @"_xdg-terminal-exec": bool = false,
 
@@ -4954,6 +4962,27 @@ pub fn finalize(self: *Config) !void {
 
     // Finalize key remapping set for efficient lookups
     self.@"key-remap".finalize();
+}
+
+/// Returns where the key was last set, or null if it is still the default.
+pub fn sourceOf(self: *const Config, key: Key) ?Source {
+    return self._sources.get(@tagName(key));
+}
+
+/// Callback for src/cli/args.zig after a field is parsed successfully.
+pub fn parsedFieldHook(
+    self: *Config,
+    alloc: Allocator,
+    key: []const u8,
+    iter: anytype,
+) !void {
+    const k = std.meta.stringToEnum(Key, key) orelse return;
+    const loc = try cli.Location.fromIter(iter, alloc);
+    try self._sources.put(
+        alloc,
+        @tagName(k),
+        Source.fromLocation(loc, self._theme_path),
+    );
 }
 
 /// Callback for src/cli/args.zig to allow us to handle special cases
@@ -11389,4 +11418,75 @@ test "compatibility: window new-window" {
             cfg.@"macos-dock-drop-behavior",
         );
     }
+}
+
+test "source: records file and line of last set" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    const path = "/home/ghostty/.config/ghostty/config.ghostty";
+    var reader: std.Io.Reader = .fixed("font-size = 12\n\n# c\nfont-size = 14\n");
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, path);
+    try cfg.finalize();
+
+    try testing.expectEqual(@as(?Source, null), cfg.sourceOf(.@"font-family"));
+    const s = cfg.sourceOf(.@"font-size").?;
+    try testing.expectEqualStrings(path, s.file.path);
+    try testing.expectEqual(@as(usize, 4), s.file.line);
+}
+
+test "source: invalid value keeps previous source" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var reader: std.Io.Reader = .fixed("font-size = 12\nfont-size = abc\n");
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, "/home/ghostty/.config/ghostty/config.ghostty");
+    try cfg.finalize();
+
+    try testing.expectEqual(@as(usize, 1), cfg.sourceOf(.@"font-size").?.file.line);
+    try testing.expect(!cfg._diagnostics.empty());
+}
+
+test "source: empty value reset records resetting line" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var reader: std.Io.Reader = .fixed("font-size = 12\nfont-size =\n");
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, "/home/ghostty/.config/ghostty/config.ghostty");
+    try cfg.finalize();
+
+    try testing.expectEqual(@as(usize, 2), cfg.sourceOf(.@"font-size").?.file.line);
+}
+
+test "source: compat handler does not record" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var reader: std.Io.Reader = .fixed("gtk-tabs-location = hidden\n");
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, "/home/ghostty/.config/ghostty/config.ghostty");
+    try cfg.finalize();
+
+    try testing.expect(cfg.@"window-show-tab-bar" == .never);
+    try testing.expectEqual(@as(?Source, null), cfg.sourceOf(.@"window-show-tab-bar"));
+}
+
+test "source: iterator without location records other" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    var it: TestIterator = .{ .data = &.{"--font-size=14"} };
+    try cfg.loadIter(alloc, &it);
+    try cfg.finalize();
+
+    try testing.expect(cfg.sourceOf(.@"font-size").? == .other);
 }

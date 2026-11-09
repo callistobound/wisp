@@ -10,6 +10,7 @@ pub const string = @import("config/string.zig");
 pub const edit = @import("config/edit.zig");
 pub const url = @import("config/url.zig");
 
+pub const Source = @import("config/source.zig").Source;
 pub const ConditionalState = conditional.State;
 pub const FileFormatter = formatter_file.FileFormatter;
 pub const entryFormatter = formatter.entryFormatter;

@@ -133,7 +133,11 @@ pub fn parse(
             break :value null;
         };
 
-        parseIntoField(T, arena_alloc, dst, key, value) catch |err| err: {
+        if (parseIntoField(T, arena_alloc, dst, key, value)) |_| {
+            if (@hasDecl(T, "parsedFieldHook")) {
+                try dst.parsedFieldHook(arena_alloc, key, iter);
+            }
+        } else |err| err: {
             // If we get an error parsing a field, then we try to fall
             // back to compatibility handlers if able.
             if (@hasDecl(T, "compatibility")) {
@@ -175,7 +179,7 @@ pub fn parse(
                 .message = message,
                 .location = try diags.Location.fromIter(iter, arena_alloc),
             });
-        };
+        }
     }
 }
 
@@ -730,6 +734,31 @@ test "parse: empty value resets to default" {
     try parse(@TypeOf(data), testing.allocator, &data, &iter);
     try testing.expectEqual(@as(u8, 42), data.a);
     try testing.expect(!data.b);
+}
+
+test "parse: parsedFieldHook called only on success" {
+    const testing = std.testing;
+
+    var data: struct {
+        a: u8 = 0,
+        hits: u8 = 0,
+        _arena: ?ArenaAllocator = null,
+        _diagnostics: DiagnosticList = .{},
+
+        pub fn parsedFieldHook(self: *@This(), _: Allocator, _: []const u8, _: anytype) !void {
+            self.hits += 1;
+        }
+    } = .{};
+    defer if (data._arena) |arena| arena.deinit();
+
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(
+        testing.allocator,
+        "--a=1 --a=x --b=2",
+    );
+    defer iter.deinit();
+    try parse(@TypeOf(data), testing.allocator, &data, &iter);
+    try testing.expectEqual(@as(u8, 1), data.hits);
+    try testing.expectEqual(@as(u8, 1), data.a);
 }
 
 test "parse: positional arguments are invalid" {
