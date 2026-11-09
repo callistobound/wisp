@@ -107,6 +107,18 @@ pub const compatibility = std.StaticStringMap(
     .{ "copy-on-select", compatCopyOnSelect },
 });
 
+/// The fields each deprecated `compatibility` key sets, for source tracking.
+/// Keys that are still Config fields record themselves and aren't listed.
+const compatibility_fields = std.StaticStringMap([]const []const u8).initComptime(&.{
+    .{ "background-blur-radius", &.{"background-blur"} },
+    .{ "adw-toolbar-style", &.{"gtk-toolbar-style"} },
+    .{ "gtk-tabs-location", &.{"window-show-tab-bar"} },
+    .{ "cursor-invert-fg-bg", &.{ "cursor-color", "cursor-text" } },
+    .{ "selection-invert-fg-bg", &.{ "selection-foreground", "selection-background" } },
+    .{ "bold-is-bright", &.{"bold-color"} },
+    .{ "scrollback-limit", &.{"scrollback-limit-bytes"} },
+});
+
 /// Set Ghostty's graphical user interface language to a language other than the
 /// system default language. For example:
 ///
@@ -4996,11 +5008,29 @@ pub fn parsedFieldHook(
 ) !void {
     const k = std.meta.stringToEnum(Key, key) orelse return;
     const loc = try cli.Location.fromIter(iter, alloc);
-    try self._sources.put(
-        alloc,
-        @tagName(k),
-        Source.fromLocation(loc, self._theme_path),
-    );
+    try self.recordSource(alloc, k, loc);
+}
+
+/// Callback for src/cli/args.zig after a compatibility handler succeeds.
+pub fn compatHandledHook(
+    self: *Config,
+    alloc: Allocator,
+    key: []const u8,
+    iter: anytype,
+) !void {
+    const loc = try cli.Location.fromIter(iter, alloc);
+    if (compatibility_fields.get(key)) |fields| {
+        for (fields) |field| {
+            const k = std.meta.stringToEnum(Key, field) orelse continue;
+            try self.recordSource(alloc, k, loc);
+        }
+    } else if (std.meta.stringToEnum(Key, key)) |k| {
+        try self.recordSource(alloc, k, loc);
+    }
+}
+
+fn recordSource(self: *Config, alloc: Allocator, k: Key, loc: cli.Location) !void {
+    try self._sources.put(alloc, @tagName(k), Source.fromLocation(loc, self._theme_path));
 }
 
 /// Callback for src/cli/args.zig to allow us to handle special cases
@@ -11584,7 +11614,7 @@ test "source: empty value reset records resetting line" {
     try testing.expectEqual(@as(usize, 2), cfg.sourceOf(.@"font-size").?.file.line);
 }
 
-test "source: compat handler does not record" {
+test "source: compat handler records target field" {
     const testing = std.testing;
     const alloc = testing.allocator;
 
@@ -11595,7 +11625,32 @@ test "source: compat handler does not record" {
     try cfg.finalize();
 
     try testing.expect(cfg.@"window-show-tab-bar" == .never);
-    try testing.expectEqual(@as(?Source, null), cfg.sourceOf(.@"window-show-tab-bar"));
+    try testing.expectEqual(@as(usize, 1), cfg.sourceOf(.@"window-show-tab-bar").?.file.line);
+}
+
+test "source: renamed key records new field" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var reader: std.Io.Reader = .fixed("font-size = 12\nscrollback-limit = 1000\n");
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadReader(alloc, &reader, "/home/ghostty/.config/ghostty/config.ghostty");
+    try cfg.finalize();
+
+    try testing.expectEqual(@as(usize, 2), cfg.sourceOf(.@"scrollback-limit-bytes").?.file.line);
+    try testing.expect(std.meta.stringToEnum(Key, "scrollback-limit") == null);
+}
+
+test "source: compat fields drift guard" {
+    const testing = std.testing;
+    for (compatibility.keys()) |k| {
+        try testing.expect(std.meta.stringToEnum(Key, k) != null or
+            compatibility_fields.has(k));
+    }
+    for (compatibility_fields.values()) |fields| for (fields) |f| {
+        try testing.expect(std.meta.stringToEnum(Key, f) != null);
+    };
 }
 
 test "source: iterator without location records other" {

@@ -51,6 +51,7 @@ pub const Error = error{
 /// downstream after parsing is done, not through this method.
 ///
 /// If T has `parsedFieldHook`, it is called after each field is set.
+/// If T has `compatHandledHook`, it is called after a compatibility handler succeeds.
 ///
 /// Note: If the arena is already non-null, then it will be used. In this
 /// case, in the case of an error some memory might be leaked into the arena.
@@ -147,6 +148,9 @@ pub fn parse(
                 // we call it and see if it handles the error.
                 if (T.compatibility.get(key)) |handler| {
                     if (handler(dst, arena_alloc, key, value)) {
+                        if (@hasDecl(T, "compatHandledHook")) {
+                            try dst.compatHandledHook(arena_alloc, key, iter);
+                        }
                         log.info(
                             "compatibility handler for {s} handled error, you may be using a deprecated field: {}",
                             .{ key, err },
@@ -761,6 +765,36 @@ test "parse: parsedFieldHook called only on success" {
     try parse(@TypeOf(data), testing.allocator, &data, &iter);
     try testing.expectEqual(@as(u8, 1), data.hits);
     try testing.expectEqual(@as(u8, 1), data.a);
+}
+
+test "parse: compatHandledHook called when compat handles" {
+    const testing = std.testing;
+
+    var data: struct {
+        a: bool = false,
+        compat_hits: u8 = 0,
+        _arena: ?ArenaAllocator = null,
+
+        pub const compatibility: std.StaticStringMap(
+            CompatibilityHandler(@This()),
+        ) = .initComptime(&.{
+            .{ "old", compatibilityRenamed(@This(), "a") },
+        });
+
+        pub fn compatHandledHook(self: *@This(), _: Allocator, key: []const u8, _: anytype) !void {
+            try testing.expectEqualStrings("old", key);
+            self.compat_hits += 1;
+        }
+    } = .{};
+    defer if (data._arena) |arena| arena.deinit();
+
+    var iter = try std.process.Args.IteratorGeneral(.{}).init(
+        testing.allocator,
+        "--old=true --a=true",
+    );
+    defer iter.deinit();
+    try parse(@TypeOf(data), testing.allocator, &data, &iter);
+    try testing.expectEqual(@as(u8, 1), data.compat_hits);
 }
 
 test "parse: positional arguments are invalid" {
