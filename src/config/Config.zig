@@ -4045,6 +4045,9 @@ _sources: std.StringHashMapUnmanaged(Source) = .empty,
 /// Path of the theme file being loaded, so its values record as `.theme`.
 _theme_path: ?[]const u8 = null,
 
+/// Config files loaded via loadReader, in load order.
+_files: std.ArrayList([]const u8) = .empty,
+
 /// Set to true if Ghostty was executed as xdg-terminal-exec on Linux.
 @"_xdg-terminal-exec": bool = false,
 
@@ -4154,6 +4157,7 @@ fn loadReader(self: *Config, alloc: Allocator, reader: *std.Io.Reader, path: []c
             reader.toss(bom.len);
         }
     }
+    try self.addFile(path);
     var iter: cli.args.LineIterator = .{ .r = reader, .filepath = path };
     try self.loadIter(alloc, &iter);
     try self.expandPaths(std.fs.path.dirname(path).?);
@@ -4600,6 +4604,19 @@ pub fn changeConditionalState(
     return new_config;
 }
 
+/// Record a loaded config file, and keep the step for replays.
+fn addFile(self: *Config, path: []const u8) Allocator.Error!void {
+    const arena_alloc = self._arena.?.allocator();
+    const owned = try arena_alloc.dupe(u8, path);
+    try self._files.append(arena_alloc, owned);
+    try self._replay_steps.append(arena_alloc, .{ .file = owned });
+}
+
+/// Returns the config files that were loaded, in load order.
+pub fn loadedFiles(self: *const Config) []const []const u8 {
+    return self._files.items;
+}
+
 /// Expand the relative paths in config-files to be absolute paths
 /// relative to the base directory.
 fn expandPaths(self: *Config, base: []const u8) !void {
@@ -4706,7 +4723,7 @@ fn loadTheme(self: *Config, theme: Theme) !void {
     // Setup our replay to be conditional.
     conditional: for (new_config._replay_steps.items) |*item| {
         switch (item.*) {
-            .expand, .location, .diagnostic => {},
+            .expand, .file, .location, .diagnostic => {},
 
             // If we see "-e" then we do NOT make the following arguments
             // conditional since they are supposed to be part of the
@@ -5283,6 +5300,12 @@ pub fn clone(
     );
     if (self._theme_path) |v| result._theme_path = try alloc_arena.dupe(u8, v);
 
+    // Copy our loaded files
+    try result._files.ensureTotalCapacity(alloc_arena, self._files.items.len);
+    for (self._files.items) |v| result._files.appendAssumeCapacity(
+        try alloc_arena.dupe(u8, v),
+    );
+
     return result;
 }
 
@@ -5432,6 +5455,9 @@ const Replay = struct {
         /// A base path to expand relative paths against.
         expand: []const u8,
 
+        /// A loaded config file path, recorded again on replay.
+        file: []const u8,
+
         /// The location of the following arg, reported by the iterator.
         location: cli.Location,
 
@@ -5472,6 +5498,7 @@ const Replay = struct {
                 .diagnostic => |v| .{ .diagnostic = try v.clone(alloc) },
                 .arg => |v| .{ .arg = try alloc.dupeSentinel(u8, v, 0) },
                 .expand => |v| .{ .expand = try alloc.dupe(u8, v) },
+                .file => |v| .{ .file = try alloc.dupe(u8, v) },
                 .location => |v| .{ .location = try v.clone(alloc) },
                 .conditional_arg => |v| conditional: {
                     var conds = try alloc.alloc(Conditional, v.conditions.len);
@@ -5505,6 +5532,10 @@ const Replay = struct {
                         // world state changed and we can't expand anymore.
                         // In that really unfortunate case, we log a warning.
                         log.warn("error expanding paths err={}", .{err});
+                    },
+
+                    .file => |path| self.config.addFile(path) catch |err| {
+                        log.warn("error recording loaded file err={}", .{err});
                     },
 
                     .diagnostic => |diag| diag: {
@@ -10882,6 +10913,64 @@ test "clone can then change conditional state" {
         .g = 0xFF,
         .b = 0xFF,
     }, cfg_light2.background);
+}
+
+test "loaded files: in load order and included file wins" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try td.dir.writeFile(testing.io, .{ .sub_path = "a", .data = "font-size = 12\nconfig-file = b\n" });
+    try td.dir.writeFile(testing.io, .{ .sub_path = "b", .data = "font-size = 14\n" });
+    var a_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const abs_a = a_buf[0..try td.dir.realPathFile(testing.io, "a", &a_buf)];
+    var b_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const abs_b = b_buf[0..try td.dir.realPathFile(testing.io, "b", &b_buf)];
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadFile(alloc, abs_a);
+    try cfg.loadRecursiveFiles(alloc);
+    try cfg.finalize();
+
+    try testing.expectEqual(@as(usize, 2), cfg.loadedFiles().len);
+    try testing.expectEqualStrings(abs_a, cfg.loadedFiles()[0]);
+    try testing.expectEqualStrings(abs_b, cfg.loadedFiles()[1]);
+    try testing.expectEqualStrings(abs_b, cfg.sourceOf(.@"font-size").?.file.path);
+}
+
+test "loaded files: excludes theme, survives conditional change and clone" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try td.dir.writeFile(testing.io, .{ .sub_path = "theme_light", .data = "background = #ffffff\n" });
+    try td.dir.writeFile(testing.io, .{ .sub_path = "theme_dark", .data = "background = #000000\n" });
+    var light_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const light = light_buf[0..try td.dir.realPathFile(testing.io, "theme_light", &light_buf)];
+    var dark_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dark = dark_buf[0..try td.dir.realPathFile(testing.io, "theme_dark", &dark_buf)];
+
+    var contents_buf: [std.Io.Dir.max_path_bytes * 2 + 32]u8 = undefined;
+    const contents = try std.fmt.bufPrint(&contents_buf, "theme = light:{s},dark:{s}\n", .{ light, dark });
+    try td.dir.writeFile(testing.io, .{ .sub_path = "a", .data = contents });
+    var a_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const abs_a = a_buf[0..try td.dir.realPathFile(testing.io, "a", &a_buf)];
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadFile(alloc, abs_a);
+    try cfg.finalize();
+
+    var dark_cfg = (try cfg.changeConditionalState(.{ .theme = .dark })).?;
+    defer dark_cfg.deinit();
+    var cloned = try dark_cfg.clone(alloc);
+    defer cloned.deinit();
+
+    try testing.expectEqual(@as(usize, 1), cloned.loadedFiles().len);
+    try testing.expectEqualStrings(abs_a, cloned.loadedFiles()[0]);
 }
 
 test "clone preserves conditional set" {
