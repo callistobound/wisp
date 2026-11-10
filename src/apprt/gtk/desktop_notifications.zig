@@ -54,7 +54,7 @@ pub fn send(
     defer notification.unref();
     notification.setBody(body);
 
-    const icon = gio.ThemedIcon.new("com.mitchellh.ghostty");
+    const icon = gio.ThemedIcon.new("com.jamesboehmer.wisp");
     defer icon.unref();
     notification.setIcon(icon.as(gio.Icon));
     notification.setDefaultActionAndTargetValue(

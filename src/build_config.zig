@@ -55,13 +55,10 @@ pub const i18n: bool = config.i18n;
 /// There are many places that don't use this variable so simply swapping
 /// this variable is NOT ENOUGH to change the bundle ID. I just wanted to
 /// avoid it in Zig coe as much as possible.
-pub const bundle_id = if (builtin.target.os.tag.isDarwin())
-    "com.jamesboehmer.wisp"
-else
-    "com.mitchellh.ghostty";
+pub const bundle_id = "com.jamesboehmer.wisp";
 
 /// The gettext domain. Must match the domain in build/GhosttyI18n.zig.
-pub const i18n_domain = "com.mitchellh.ghostty";
+pub const i18n_domain = "com.jamesboehmer.wisp";
 
 /// True if we should have "slow" runtime safety checks. The initial motivation
 /// for this was terminal page/pagelist integrity checks. These were VERY

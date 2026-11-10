@@ -1,10 +1,10 @@
-app-id: com.mitchellh.ghostty-debug
+app-id: com.jamesboehmer.wisp-debug
 runtime: org.gnome.Platform
 runtime-version: "50"
 sdk: org.gnome.Sdk
 default-branch: tip
 command: ghostty
-rename-icon: com.mitchellh.ghostty
+rename-icon: com.jamesboehmer.wisp
 finish-args:
   # 3D rendering
   - --device=dri

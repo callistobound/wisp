@@ -159,7 +159,7 @@ in
         fi
       done
 
-      for file in "$out"/share/dbus-1/services/*.service "$out"/share/applications/com.mitchellh.ghostty*.desktop; do
+      for file in "$out"/share/dbus-1/services/*.service "$out"/share/applications/com.jamesboehmer.wisp*.desktop; do
         while IFS='=' read -r key value; do
           exe=''${value%% *}
           if [[ "$exe" != /* || ! -x "$exe" ]]; then
