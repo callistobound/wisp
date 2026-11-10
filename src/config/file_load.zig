@@ -7,17 +7,49 @@ const global = @import("../global.zig");
 
 const log = std.log.scoped(.config);
 
+/// The XDG config subdirectory: "wisp", or "ghostty" if only that
+/// exists. This only stats; it never creates anything. The returned
+/// value is static and must not be freed.
+pub fn configDirName(alloc: Allocator) ![]const u8 {
+    var environ_map = try global.environMap();
+    defer environ_map.deinit();
+    return try configDirNameIn(global.io(), alloc, &environ_map);
+}
+
+fn configDirNameIn(
+    io: std.Io,
+    alloc: Allocator,
+    environ_map: *const std.process.Environ.Map,
+) ![]const u8 {
+    inline for (.{ "wisp", "ghostty" }) |name| {
+        const path = try internal_os.xdg.config(io, alloc, environ_map, .{ .subdir = name });
+        defer alloc.free(path);
+        const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch null;
+        if (stat) |st| if (st.kind == .directory) return name;
+    }
+    return "wisp";
+}
+
+fn xdgConfigFile(
+    io: std.Io,
+    alloc: Allocator,
+    environ_map: *const std.process.Environ.Map,
+    name: []const u8,
+) ![]const u8 {
+    const subdir = try std.fs.path.join(alloc, &.{
+        try configDirNameIn(io, alloc, environ_map),
+        name,
+    });
+    defer alloc.free(subdir);
+    return try internal_os.xdg.config(io, alloc, environ_map, .{ .subdir = subdir });
+}
+
 /// Default path for the XDG home configuration file. Returned value
 /// must be freed by the caller.
 pub fn defaultXdgPath(alloc: Allocator) ![]const u8 {
     var environ_map = try global.environMap();
     defer environ_map.deinit();
-    return try internal_os.xdg.config(
-        global.io(),
-        alloc,
-        &environ_map,
-        .{ .subdir = "ghostty/config.ghostty" },
-    );
+    return try xdgConfigFile(global.io(), alloc, &environ_map, "config.ghostty");
 }
 
 /// Ghostty <1.3.0 default path for the XDG home configuration file.
@@ -25,12 +57,7 @@ pub fn defaultXdgPath(alloc: Allocator) ![]const u8 {
 pub fn legacyDefaultXdgPath(alloc: Allocator) ![]const u8 {
     var environ_map = try global.environMap();
     defer environ_map.deinit();
-    return try internal_os.xdg.config(
-        global.io(),
-        alloc,
-        &environ_map,
-        .{ .subdir = "ghostty/config" },
-    );
+    return try xdgConfigFile(global.io(), alloc, &environ_map, "config");
 }
 
 /// Preferred default path for the XDG home configuration file.
@@ -173,4 +200,50 @@ pub fn open(io: std.Io, path: []const u8) OpenFileError!std.Io.File {
     if (stat.size == 0) return OpenFileError.FileIsEmpty;
 
     return file;
+}
+
+fn testConfigDirName(dirs: []const []const u8, expected: []const u8) !void {
+    const testing = std.testing;
+    const io = testing.io;
+    const alloc = testing.allocator;
+
+    var tmp = testing.tmpDir(.{ .iterate = true });
+    defer tmp.cleanup();
+    for (dirs) |d| try tmp.dir.createDir(io, d, .default_dir);
+    const tmp_path = try tmp.dir.realPathFileAlloc(io, ".", alloc);
+    defer alloc.free(tmp_path);
+
+    var environ_map = try testing.environ.createMap(alloc);
+    defer environ_map.deinit();
+    try environ_map.put("XDG_CONFIG_HOME", tmp_path);
+
+    try testing.expectEqualStrings(expected, try configDirNameIn(io, alloc, &environ_map));
+
+    const path = try xdgConfigFile(io, alloc, &environ_map, "config.ghostty");
+    defer alloc.free(path);
+    const expected_path = try std.fs.path.join(alloc, &.{ tmp_path, expected, "config.ghostty" });
+    defer alloc.free(expected_path);
+    try testing.expectEqualStrings(expected_path, path);
+
+    // Nothing is created.
+    var count: usize = 0;
+    var it = tmp.dir.iterate();
+    while (try it.next(io)) |_| count += 1;
+    try testing.expectEqual(dirs.len, count);
+}
+
+test "file_load configDirName only ghostty" {
+    try testConfigDirName(&.{"ghostty"}, "ghostty");
+}
+
+test "file_load configDirName only wisp" {
+    try testConfigDirName(&.{"wisp"}, "wisp");
+}
+
+test "file_load configDirName both" {
+    try testConfigDirName(&.{ "wisp", "ghostty" }, "wisp");
+}
+
+test "file_load configDirName neither" {
+    try testConfigDirName(&.{}, "wisp");
 }

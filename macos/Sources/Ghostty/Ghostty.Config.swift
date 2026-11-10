@@ -403,7 +403,13 @@ extension Ghostty {
         }
 
         var macosCustomIcon: String {
-            let defaultValue = NSString("~/.config/ghostty/Ghostty.icns").expandingTildeInPath
+            // ~/.config/wisp, falling back to ~/.config/ghostty if only it exists.
+            let configDir = ["wisp", "ghostty"].first { name in
+                var isDir: ObjCBool = false
+                let path = NSString(string: "~/.config/\(name)").expandingTildeInPath
+                return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+            } ?? "wisp"
+            let defaultValue = NSString(string: "~/.config/\(configDir)/Ghostty.icns").expandingTildeInPath
             guard let config = self.config else { return defaultValue }
             var v: UnsafePointer<Int8>?
             let key = "macos-custom-icon"
