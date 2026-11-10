@@ -164,12 +164,7 @@ fn runOp(
     op: file_edit.Op,
     stderr: *std.Io.Writer,
 ) !u8 {
-    const path: []const u8 = if (opts.file) |f| path: {
-        if (std.fs.path.isAbsolute(f)) break :path try alloc.dupe(u8, f);
-        const cwd = try cwdPath(alloc);
-        defer alloc.free(cwd);
-        break :path try std.fs.path.resolve(alloc, &.{ cwd, f });
-    } else try configpkg.edit.openPath(alloc);
+    const path: []const u8 = try filePath(alloc, opts) orelse try configpkg.edit.openPath(alloc);
     defer alloc.free(path);
 
     file_edit.applyToFile(global.io(), alloc, path, op) catch |err| switch (err) {
@@ -188,6 +183,15 @@ fn runOp(
         else => return err,
     };
     return 0;
+}
+
+/// The absolute path for `--file`, or null if it isn't set.
+fn filePath(alloc: Allocator, opts: Options) !?[]u8 {
+    const f = opts.file orelse return null;
+    if (std.fs.path.isAbsolute(f)) return try alloc.dupe(u8, f);
+    const cwd = try cwdPath(alloc);
+    defer alloc.free(cwd);
+    return try std.fs.path.resolve(alloc, &.{ cwd, f });
 }
 
 fn cwdPath(alloc: Allocator) ![]u8 {
@@ -234,7 +238,7 @@ fn runInner(alloc: Allocator, opts: Options, stderr: *std.Io.Writer) !u8 {
     defer config.deinit();
 
     // Find the preferred path.
-    const path = try configpkg.preferredDefaultFilePath(alloc);
+    const path = try filePath(alloc, opts) orelse try configpkg.preferredDefaultFilePath(alloc);
     defer alloc.free(path);
 
     // We don't currently support Windows because we use the exec syscall.
@@ -338,4 +342,21 @@ test "resolveOp" {
     try testing.expectError(error.InvalidValue, resolveOp(alloc, .{ .set = "font-size=abc" }));
     try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "keybind=ctrl+a=new_tab" }));
     try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "palette=1=#ff0000" }));
+}
+
+test "filePath" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    try testing.expect((try filePath(alloc, .{})) == null);
+
+    const abs = if (comptime builtin.os.tag == .windows) "C:\\x\\config" else "/x/config";
+    const got_abs = (try filePath(alloc, .{ .file = abs })).?;
+    defer alloc.free(got_abs);
+    try testing.expectEqualStrings(abs, got_abs);
+
+    const got_rel = (try filePath(alloc, .{ .file = "config" })).?;
+    defer alloc.free(got_rel);
+    try testing.expect(std.fs.path.isAbsolute(got_rel));
+    try testing.expectEqualStrings("config", std.fs.path.basename(got_rel));
 }
