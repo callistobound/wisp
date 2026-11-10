@@ -117,7 +117,7 @@ fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
     const idx = std.mem.indexOfScalar(u8, raw, '=') orelse return error.MissingValue;
     const entry: file_edit.Entry = .{ .key = raw[0..idx], .value = raw[idx + 1 ..] };
     const key = std.meta.stringToEnum(Key, entry.key) orelse return error.UnknownKey;
-    if (opts.set != null and isRepeatable(key)) return error.RepeatableKey;
+    if (opts.set != null and configpkg.schema.isRepeatable(key)) return error.RepeatableKey;
 
     if (opts.remove == null) {
         var cfg = try Config.default(alloc);
@@ -131,31 +131,6 @@ fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
     if (opts.set != null) return .{ .set = entry };
     if (opts.add != null) return .{ .add = entry };
     return .{ .remove = entry };
-}
-
-/// True if each line for `key` adds an entry rather than replacing the value.
-fn isRepeatable(key: Key) bool {
-    @setEvalBranchQuota(10_000);
-    const types = [_]type{
-        Config.RepeatableString,
-        Config.RepeatablePath,
-        configpkg.RepeatableStringMap,
-        Config.RepeatableFontVariation,
-        Config.RepeatableCodepointMap,
-        Config.RepeatableClipboardCodepointMap,
-        Config.RepeatableLink,
-        Config.RepeatableCommand,
-        configpkg.io.RepeatableReadableIO,
-        Config.Keybinds,
-        Config.Palette,
-        @import("../input/key_mods.zig").RemapSet,
-    };
-    switch (key) {
-        inline else => |k| {
-            inline for (types) |T| if (@FieldType(Config, @tagName(k)) == T) return true;
-            return false;
-        },
-    }
 }
 
 fn runOp(
