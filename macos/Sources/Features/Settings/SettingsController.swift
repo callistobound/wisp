@@ -1,12 +1,12 @@
 import Cocoa
-import Combine
 import GhosttyKit
 import SwiftUI
 
 class SettingsController: NSWindowController, NSWindowDelegate {
     static let shared: SettingsController = SettingsController()
 
-    private var configCancellable: AnyCancellable?
+    private let model: SettingsModel?
+    private var watcher: ConfigFileWatcher?
 
     init() {
         let window = NSWindow(
@@ -18,7 +18,7 @@ class SettingsController: NSWindowController, NSWindowDelegate {
         window.contentMinSize = NSSize(width: 720, height: 480)
         window.isReleasedWhenClosed = false
 
-        // Saving reloads the config, which publishes a new one for the model.
+        // Saving reloads the config, which posts a new one for the model.
         let ghostty = (NSApp.delegate as? AppDelegate)?.ghostty
         let model = ghostty.map { ghostty in
             SettingsModel(
@@ -38,12 +38,15 @@ class SettingsController: NSWindowController, NSWindowDelegate {
         window.center()
         window.setFrameAutosaveName("SettingsWindow")
 
+        self.model = model
         super.init(window: window)
         window.delegate = self
 
-        configCancellable = ghostty?.$config.dropFirst().sink { [weak model] config in
-            Task { @MainActor in model?.reload(config: config) }
-        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(ghosttyConfigDidChange(_:)),
+            name: .ghosttyConfigDidChange,
+            object: nil)
     }
 
     required init?(coder: NSCoder) {
@@ -54,6 +57,30 @@ class SettingsController: NSWindowController, NSWindowDelegate {
 
     func show() {
         window?.makeKeyAndOrderFront(nil)
+        startWatching()
+    }
+
+    // MARK: - Config Files
+
+    /// Reloads the app config when a config file changes while the window is open.
+    private func startWatching() {
+        guard watcher == nil, let model, let ghostty = (NSApp.delegate as? AppDelegate)?.ghostty else { return }
+        watcher = ConfigFileWatcher(paths: model.files) { [weak ghostty] in ghostty?.reloadConfig() }
+    }
+
+    @objc private func ghosttyConfigDidChange(_ notification: Notification) {
+        // Only app-level configs; surface configs are posted with the surface as the object.
+        guard notification.object == nil,
+              let config = notification.userInfo?[Notification.Name.GhosttyConfigChangeKey] as? Ghostty.Config,
+              let model else { return }
+        model.reload(config: config)
+        watcher?.update(paths: model.files)
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        watcher = nil
     }
 
     // MARK: - First Responder
