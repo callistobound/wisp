@@ -22,8 +22,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "In Ghostty öffnen"
+msgid "Open in Wisp"
+msgstr "In Wisp öffnen"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -174,14 +174,14 @@ msgstr "Konfiguration neu laden"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
 msgstr ""
-"⚠️ Du verwendest einen Debug Build von Ghostty! Die Leistung wird reduziert "
+"⚠️ Du verwendest einen Debug Build von Wisp! Die Leistung wird reduziert "
 "sein."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: Terminalinspektor"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: Terminalinspektor"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -204,8 +204,8 @@ msgid "Terminal Inspector"
 msgstr "Terminalinspektor"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "Über Ghostty"
+msgid "About Wisp"
+msgstr "Über Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -322,8 +322,8 @@ msgstr ""
 "sein. Es scheint, dass Anweisungen ausgeführt werden könnten."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "Ghostty schließen?"
+msgid "Quit Wisp?"
+msgstr "Wisp schließen?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1166,5 +1166,5 @@ msgid "Quit the application."
 msgstr "Anwendung beenden."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "Einen kleinen Ghostty in dein Terminal setzen."
+msgid "Put a little Wisp in your terminal."
+msgstr "Einen kleinen Wisp in dein Terminal setzen."

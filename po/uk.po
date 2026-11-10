@@ -20,8 +20,8 @@ msgstr ""
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "Відкрити в Ghostty"
+msgid "Open in Wisp"
+msgstr "Відкрити в Wisp"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -172,13 +172,13 @@ msgstr "Перезавантажити налаштування"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
 msgstr ""
-"⚠️ Ви використовуєте збірку Ghostty для налагодження! Швидкодія буде нижчою."
+"⚠️ Ви використовуєте збірку Wisp для налагодження! Швидкодія буде нижчою."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: Інспектор терміналу"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: Інспектор терміналу"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -201,8 +201,8 @@ msgid "Terminal Inspector"
 msgstr "Інспектор терміналу"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "Про Ghostty"
+msgid "About Wisp"
+msgstr "Про Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -317,8 +317,8 @@ msgstr ""
 "можуть бути виконані деякі команди."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "Вийти з Ghostty?"
+msgid "Quit Wisp?"
+msgstr "Вийти з Wisp?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1162,5 +1162,5 @@ msgid "Quit the application."
 msgstr "Вийти із застосунку."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "Вставити маленького Ghostty у ваш термінал."
+msgid "Put a little Wisp in your terminal."
+msgstr "Вставити маленького Wisp у ваш термінал."

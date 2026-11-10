@@ -19,8 +19,8 @@ msgstr ""
 "(n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "Atidaryti su Ghostty"
+msgid "Open in Wisp"
+msgstr "Atidaryti su Wisp"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -171,12 +171,12 @@ msgstr "Iš naujo įkelti konfigūraciją"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
-msgstr "⚠️ Naudojate Ghostty derinimo versiją! Našumas bus sumažintas."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
+msgstr "⚠️ Naudojate Wisp derinimo versiją! Našumas bus sumažintas."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: terminalo inspektorius"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: terminalo inspektorius"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -199,8 +199,8 @@ msgid "Terminal Inspector"
 msgstr "Terminalo inspektorius"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "Apie Ghostty"
+msgid "About Wisp"
+msgstr "Apie Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -316,8 +316,8 @@ msgstr ""
 "gali būti vykdomos tam tikros komandos."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "Išeiti iš Ghostty?"
+msgid "Quit Wisp?"
+msgstr "Išeiti iš Wisp?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1167,5 +1167,5 @@ msgid "Quit the application."
 msgstr "Išeiti iš programos."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "Įleiskite truputį Ghostty į savo terminalą."
+msgid "Put a little Wisp in your terminal."
+msgstr "Įleiskite truputį Wisp į savo terminalą."

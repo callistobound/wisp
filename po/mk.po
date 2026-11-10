@@ -18,8 +18,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "Отвори во Ghostty"
+msgid "Open in Wisp"
+msgstr "Отвори во Wisp"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -170,13 +170,13 @@ msgstr "Одново вчитај конфигурација"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
 msgstr ""
-"⚠️ Извршувате дебаг верзија на Ghostty! Перформансите ќе бидат намалени."
+"⚠️ Извршувате дебаг верзија на Wisp! Перформансите ќе бидат намалени."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: Инспектор на терминал"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: Инспектор на терминал"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -199,8 +199,8 @@ msgid "Terminal Inspector"
 msgstr "Инспектор на терминал"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "За Ghostty"
+msgid "About Wisp"
+msgstr "За Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -316,8 +316,8 @@ msgstr ""
 "изгледа како да ќе се извршат одредени команди."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "Излези од Ghostty?"
+msgid "Quit Wisp?"
+msgstr "Излези од Wisp?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1194,5 +1194,5 @@ msgid "Quit the application."
 msgstr "Прекини ја апликацијата."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "Внеси мал Ghostty во твојот терминал."
+msgid "Put a little Wisp in your terminal."
+msgstr "Внеси мал Wisp во твојот терминал."

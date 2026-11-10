@@ -18,8 +18,8 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n==1 ? 0 : n==2 ? 1 : 2;\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "Oscail i nGhostty"
+msgid "Open in Wisp"
+msgstr "Oscail i nWisp"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -170,13 +170,13 @@ msgstr "Athlódáil cumraíocht"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
 msgstr ""
-"⚠️ Tá leagan dífhabhtaithe de Ghostty á rith agat! Laghdófar an fheidhmíocht."
+"⚠️ Tá leagan dífhabhtaithe de Wisp á rith agat! Laghdófar an fheidhmíocht."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: Cigire teirminéil"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: Cigire teirminéil"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -199,8 +199,8 @@ msgid "Terminal Inspector"
 msgstr "Cigire teirminéil"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "Maidir le Ghostty"
+msgid "About Wisp"
+msgstr "Maidir le Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -315,8 +315,8 @@ msgstr ""
 "teirminéal, toisc go d'fhéadfadh roinnt orduithe a fhorghníomhú."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "Scoir Ghostty?"
+msgid "Quit Wisp?"
+msgstr "Scoir Wisp?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1187,5 +1187,5 @@ msgid "Quit the application."
 msgstr "Scoir an feidhmchlár."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "Cuir Ghosttín i do teirminéal."
+msgid "Put a little Wisp in your terminal."
+msgstr "Cuir Wisp i do teirminéal."

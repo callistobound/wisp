@@ -95,7 +95,7 @@ pub const SurfaceChildExited = extern struct {
         const banner = priv.banner;
         const data = priv.data orelse {
             // Not localized on purpose.
-            banner.as(adw.Banner).setTitle("This is a bug in Ghostty. Please report it.");
+            banner.as(adw.Banner).setTitle("This is a bug in Wisp. Please report it.");
             return;
         };
         if (data.exit_code == 0) {

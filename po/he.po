@@ -21,8 +21,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: dist/linux/ghostty_nautilus.py:53
-msgid "Open in Ghostty"
-msgstr "פתח/י בGhostty"
+msgid "Open in Wisp"
+msgstr "פתח/י בWisp"
 
 #: src/apprt/gtk/ui/1.0/search-overlay.blp:29
 msgid "Find…"
@@ -172,12 +172,12 @@ msgstr "טעינה מחדש של ההגדרות"
 
 #: src/apprt/gtk/ui/1.3/debug-warning.blp:6
 msgid ""
-"⚠️ You're running a debug build of Ghostty! Performance will be degraded."
-msgstr "⚠️ את/ה מריץ/ה גרסת ניפוי שגיאות של Ghostty! הביצועים יהיו ירודים."
+"⚠️ You're running a debug build of Wisp! Performance will be degraded."
+msgstr "⚠️ את/ה מריץ/ה גרסת ניפוי שגיאות של Wisp! הביצועים יהיו ירודים."
 
 #: src/apprt/gtk/ui/1.4/inspector-window.blp:5
-msgid "Ghostty: Terminal Inspector"
-msgstr "Ghostty: בודק המסוף"
+msgid "Wisp: Terminal Inspector"
+msgstr "Wisp: בודק המסוף"
 
 #: src/apprt/gtk/ui/1.4/window.blp:62 src/apprt/gtk/ui/1.4/window.blp:113
 msgid "New Split"
@@ -200,8 +200,8 @@ msgid "Terminal Inspector"
 msgstr "בודק המסוף"
 
 #: src/apprt/gtk/ui/1.4/window.blp:328
-msgid "About Ghostty"
-msgstr "אודות Ghostty"
+msgid "About Wisp"
+msgstr "אודות Wisp"
 
 #: src/apprt/gtk/ui/1.4/window.blp:333 src/input/command.zig:725
 msgid "Quit"
@@ -313,8 +313,8 @@ msgstr ""
 "פקודות מסוימות."
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:183
-msgid "Quit Ghostty?"
-msgstr "לצאת מGhostty?"
+msgid "Quit Wisp?"
+msgstr "לצאת מWisp?"
 
 #: src/apprt/gtk/class/close_confirmation_dialog.zig:184
 msgid "Close Tab?"
@@ -1154,5 +1154,5 @@ msgid "Quit the application."
 msgstr "צא/י מהאפליקציה."
 
 #: src/input/command.zig:732
-msgid "Put a little Ghostty in your terminal."
-msgstr "הכנס/י קצת Ghostty למסוף שלך."
+msgid "Put a little Wisp in your terminal."
+msgstr "הכנס/י קצת Wisp למסוף שלך."
