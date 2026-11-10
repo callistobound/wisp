@@ -3,7 +3,10 @@
 //! `cli.args.LineIterator`.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const builtin = @import("builtin");
 const cli = @import("../cli.zig");
+const internal_os = @import("../os/main.zig");
+const testing = std.testing;
 
 const bom = "\xEF\xBB\xBF";
 
@@ -29,6 +32,45 @@ pub fn apply(alloc: Allocator, src: []const u8, op: Op) Error![]u8 {
         error.WriteFailed => error.OutOfMemory,
         else => |e| e,
     };
+}
+
+/// Apply `op` to the file at absolute `path`, creating it if missing. The
+/// write is atomic and goes to the symlink target, not over the link.
+pub fn applyToFile(io: std.Io, alloc: Allocator, path: []const u8, op: Op) !void {
+    const real: ?[:0]u8 = std.Io.Dir.realPathFileAbsoluteAlloc(io, path, alloc) catch |err| switch (err) {
+        error.FileNotFound => null,
+        else => |e| return e,
+    };
+    defer if (real) |r| alloc.free(r);
+    const target = if (real) |r| r else path;
+
+    const dir_path = std.fs.path.dirname(target) orelse return error.FileNotFound;
+    var dir = try std.Io.Dir.openDirAbsolute(io, dir_path, .{});
+    defer dir.close(io);
+    const base = std.fs.path.basename(target);
+
+    var perms: std.Io.File.Permissions = .default_file;
+    const src: []u8 = if (real != null) src: {
+        const st = try dir.statFile(io, base, .{});
+        perms = st.permissions;
+        break :src try dir.readFileAlloc(io, base, alloc, .unlimited);
+    } else try alloc.alloc(u8, 0);
+    defer alloc.free(src);
+
+    const out = try apply(alloc, src, op);
+    defer alloc.free(out);
+    if (std.mem.eql(u8, src, out)) return;
+
+    var buf: [1024]u8 = undefined;
+    var atomic = try dir.createFileAtomic(io, base, .{
+        .permissions = perms,
+        .replace = true,
+    });
+    defer atomic.deinit(io);
+    var w = atomic.file.writer(io, &buf);
+    try w.interface.writeAll(out);
+    try w.flush();
+    try atomic.replace(io);
 }
 
 fn applyInner(
@@ -312,4 +354,54 @@ test "file_edit: unset of a last line without newline" {
 
 test "file_edit: set matches a key with a space before equals" {
     try expectApply("font-size =12\n", set("font-size", "14"), "font-size = 14\n");
+}
+
+fn testPath(td: *internal_os.TempDir, buf: []u8, name: []const u8) ![]const u8 {
+    var dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir = dir_buf[0..try td.dir.realPathFile(testing.io, ".", &dir_buf)];
+    return std.fmt.bufPrint(buf, "{s}{c}{s}", .{ dir, std.fs.path.sep, name });
+}
+
+fn testWrite(td: *internal_os.TempDir, name: []const u8, data: []const u8, perms: std.Io.File.Permissions) !void {
+    try td.dir.writeFile(testing.io, .{ .sub_path = name, .data = data, .flags = .{ .permissions = perms } });
+}
+
+test "file_edit: applyToFile edits through a symlink" {
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try testWrite(&td, "real.ghostty", "# keep\nfont-size = 12\n", .default_file);
+    try td.dir.symLink(testing.io, "real.ghostty", "link.ghostty", .{});
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "link.ghostty"), set("font-size", "14"));
+
+    const got = try td.dir.readFileAlloc(testing.io, "real.ghostty", testing.allocator, .unlimited);
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings("# keep\nfont-size = 14\n", got);
+    var link_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    _ = try td.dir.readLink(testing.io, "link.ghostty", &link_buf);
+}
+
+test "file_edit: applyToFile creates a missing file" {
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "new.ghostty"), set("font-size", "14"));
+
+    const got = try td.dir.readFileAlloc(testing.io, "new.ghostty", testing.allocator, .unlimited);
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings("font-size = 14\n", got);
+}
+
+test "file_edit: applyToFile keeps permissions" {
+    if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try testWrite(&td, "a.ghostty", "a = 1\n", .fromMode(0o600));
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "a.ghostty"), set("font-size", "14"));
+
+    const stat = try td.dir.statFile(testing.io, "a.ghostty", .{});
+    try testing.expectEqual(@as(u32, 0o600), stat.permissions.toMode() & 0o777);
 }
