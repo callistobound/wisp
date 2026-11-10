@@ -54,6 +54,7 @@ pub const Options = struct {
 /// Flags:
 ///
 ///   * `--set=key=value`: Set an option, replacing its last line in the file.
+///     Repeatable options like `keybind` need `--add` or `--remove` instead.
 ///   * `--unset=key`: Remove every line for an option.
 ///   * `--add=key=value`: Append a line, for repeatable options like `keybind`.
 ///   * `--remove=key=value`: Remove the lines matching an option and value.
@@ -93,6 +94,7 @@ const ResolveError = Allocator.Error || error{
     MissingValue,
     UnknownKey,
     InvalidValue,
+    RepeatableKey,
 };
 
 /// Turn the op flags into an edit. Null if none are set. The result
@@ -114,7 +116,8 @@ fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
     const raw = opts.set orelse opts.add orelse opts.remove.?;
     const idx = std.mem.indexOfScalar(u8, raw, '=') orelse return error.MissingValue;
     const entry: file_edit.Entry = .{ .key = raw[0..idx], .value = raw[idx + 1 ..] };
-    if (std.meta.stringToEnum(Key, entry.key) == null) return error.UnknownKey;
+    const key = std.meta.stringToEnum(Key, entry.key) orelse return error.UnknownKey;
+    if (opts.set != null and isRepeatable(key)) return error.RepeatableKey;
 
     if (opts.remove == null) {
         var cfg = try Config.default(alloc);
@@ -128,6 +131,31 @@ fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
     if (opts.set != null) return .{ .set = entry };
     if (opts.add != null) return .{ .add = entry };
     return .{ .remove = entry };
+}
+
+/// True if each line for `key` adds an entry rather than replacing the value.
+fn isRepeatable(key: Key) bool {
+    @setEvalBranchQuota(10_000);
+    const types = [_]type{
+        Config.RepeatableString,
+        Config.RepeatablePath,
+        configpkg.RepeatableStringMap,
+        Config.RepeatableFontVariation,
+        Config.RepeatableCodepointMap,
+        Config.RepeatableClipboardCodepointMap,
+        Config.RepeatableLink,
+        Config.RepeatableCommand,
+        configpkg.io.RepeatableReadableIO,
+        Config.Keybinds,
+        Config.Palette,
+        @import("../input/key_mods.zig").RemapSet,
+    };
+    switch (key) {
+        inline else => |k| {
+            inline for (types) |T| if (@FieldType(Config, @tagName(k)) == T) return true;
+            return false;
+        },
+    }
 }
 
 fn runOp(
@@ -183,6 +211,11 @@ fn runInner(alloc: Allocator, opts: Options, stderr: *std.Io.Writer) !u8 {
                 const raw = opts.set orelse opts.add orelse opts.remove.?;
                 const idx = std.mem.indexOfScalar(u8, raw, '=').?;
                 try stderr.print("error: invalid value for {s}: {s}\n", .{ raw[0..idx], raw[idx + 1 ..] });
+            },
+            error.RepeatableKey => {
+                const raw = opts.set.?;
+                const key = raw[0..std.mem.indexOfScalar(u8, raw, '=').?];
+                try stderr.print("error: {s} can be repeated; use --add, --remove or --unset\n", .{key});
             },
         }
         return 1;
@@ -303,4 +336,6 @@ test "resolveOp" {
     try testing.expectError(error.MissingValue, resolveOp(alloc, .{ .set = "font-size" }));
     try testing.expectError(error.UnknownKey, resolveOp(alloc, .{ .set = "nope=1" }));
     try testing.expectError(error.InvalidValue, resolveOp(alloc, .{ .set = "font-size=abc" }));
+    try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "keybind=ctrl+a=new_tab" }));
+    try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "palette=1=#ff0000" }));
 }
