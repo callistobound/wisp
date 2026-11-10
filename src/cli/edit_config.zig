@@ -8,10 +8,20 @@ const configpkg = @import("../config.zig");
 const internal_os = @import("../os/main.zig");
 const Config = configpkg.Config;
 const global = @import("../global.zig");
+const file_edit = configpkg.file_edit;
+const Key = @import("../config/key.zig").Key;
 
 pub const Options = struct {
+    set: ?[:0]const u8 = null,
+    unset: ?[:0]const u8 = null,
+    add: ?[:0]const u8 = null,
+    remove: ?[:0]const u8 = null,
+    file: ?[:0]const u8 = null,
+
+    _arena: ?std.heap.ArenaAllocator = null,
+
     pub fn deinit(self: Options) void {
-        _ = self;
+        if (self._arena) |arena| arena.deinit();
     }
 
     /// Enables `-h` and `--help` to work.
@@ -38,6 +48,18 @@ pub const Options = struct {
 /// prioritizing the Application Support directory if neither are
 /// non-empty.
 ///
+/// The flags below edit the config file in place and keep everything else
+/// in it, and they don't open an editor.
+///
+/// Flags:
+///
+///   * `--set=key=value`: Set an option, replacing its last line in the file.
+///     Repeatable options like `keybind` need `--add` or `--remove` instead.
+///   * `--unset=key`: Remove every line for an option.
+///   * `--add=key=value`: Append a line, for repeatable options like `keybind`.
+///   * `--remove=key=value`: Remove the lines matching an option and value.
+///   * `--file=path`: Edit this file instead of the default config file.
+///
 /// This command prefers the `$VISUAL` environment variable over `$EDITOR`,
 /// if both are set. If neither are set, it will print an error
 /// and exit.
@@ -61,13 +83,162 @@ pub fn run(alloc: Allocator) !u8 {
         try args.parse(Options, alloc, &opts, &iter);
     }
 
-    const result = runInner(alloc, stderr);
+    const result = runInner(alloc, opts, stderr);
     // Flushing *shouldn't* fail but...
     stderr.flush() catch {};
     return result;
 }
 
-fn runInner(alloc: Allocator, stderr: *std.Io.Writer) !u8 {
+const ResolveError = Allocator.Error || error{
+    MultipleOps,
+    MissingValue,
+    UnknownKey,
+    InvalidValue,
+    RepeatableKey,
+};
+
+/// Turn the op flags into an edit. Null if none are set. The result
+/// borrows from `opts`.
+fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
+    const flags = [_]?[:0]const u8{ opts.set, opts.unset, opts.add, opts.remove };
+    var n: usize = 0;
+    for (flags) |f| {
+        if (f != null) n += 1;
+    }
+    if (n == 0) return null;
+    if (n > 1) return error.MultipleOps;
+
+    if (opts.unset) |key| {
+        if (std.meta.stringToEnum(Key, key) == null) return error.UnknownKey;
+        return .{ .unset = key };
+    }
+
+    const raw = opts.set orelse opts.add orelse opts.remove.?;
+    const idx = std.mem.indexOfScalar(u8, raw, '=') orelse return error.MissingValue;
+    const entry: file_edit.Entry = .{ .key = raw[0..idx], .value = raw[idx + 1 ..] };
+    const key = std.meta.stringToEnum(Key, entry.key) orelse return error.UnknownKey;
+    if (opts.set != null and isRepeatable(key)) return error.RepeatableKey;
+
+    if (opts.remove == null) {
+        var cfg = try Config.default(alloc);
+        defer cfg.deinit();
+        args.parseIntoField(Config, cfg._arena.?.allocator(), &cfg, entry.key, entry.value) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return error.InvalidValue,
+        };
+    }
+
+    if (opts.set != null) return .{ .set = entry };
+    if (opts.add != null) return .{ .add = entry };
+    return .{ .remove = entry };
+}
+
+/// True if each line for `key` adds an entry rather than replacing the value.
+fn isRepeatable(key: Key) bool {
+    @setEvalBranchQuota(10_000);
+    const types = [_]type{
+        Config.RepeatableString,
+        Config.RepeatablePath,
+        configpkg.RepeatableStringMap,
+        Config.RepeatableFontVariation,
+        Config.RepeatableCodepointMap,
+        Config.RepeatableClipboardCodepointMap,
+        Config.RepeatableLink,
+        Config.RepeatableCommand,
+        configpkg.io.RepeatableReadableIO,
+        Config.Keybinds,
+        Config.Palette,
+        @import("../input/key_mods.zig").RemapSet,
+    };
+    switch (key) {
+        inline else => |k| {
+            inline for (types) |T| if (@FieldType(Config, @tagName(k)) == T) return true;
+            return false;
+        },
+    }
+}
+
+fn runOp(
+    alloc: Allocator,
+    opts: Options,
+    op: file_edit.Op,
+    stderr: *std.Io.Writer,
+) !u8 {
+    // openPath returns [:0]; dupe so every branch frees as a plain slice.
+    const path: []u8 = try filePath(alloc, opts) orelse path: {
+        const p = try configpkg.edit.openPath(alloc);
+        defer alloc.free(p);
+        break :path try alloc.dupe(u8, p);
+    };
+    defer alloc.free(path);
+
+    file_edit.applyToFile(global.io(), alloc, path, op) catch |err| switch (err) {
+        error.DanglingSymlink => {
+            try stderr.print("error: {s} is a symlink to a missing file\n", .{path});
+            return 1;
+        },
+        error.HardLink => {
+            try stderr.print("error: {s} has multiple hard links; edit it directly\n", .{path});
+            return 1;
+        },
+        error.AccessDenied, error.ReadOnlyFileSystem => {
+            try stderr.print("error: cannot write {s}\n", .{path});
+            return 1;
+        },
+        error.InvalidValue => {
+            const e = switch (op) {
+                .set, .add, .remove => |e| e,
+                .unset => |k| file_edit.Entry{ .key = k, .value = "" },
+            };
+            try stderr.print("error: invalid value for {s}: {s}\n", .{ e.key, e.value });
+            return 1;
+        },
+        else => return err,
+    };
+    return 0;
+}
+
+/// The absolute path for `--file`, or null if it isn't set.
+fn filePath(alloc: Allocator, opts: Options) !?[]u8 {
+    const f = opts.file orelse return null;
+    if (std.fs.path.isAbsolute(f)) return try alloc.dupe(u8, f);
+    const cwd = try cwdPath(alloc);
+    defer alloc.free(cwd);
+    return try std.fs.path.resolve(alloc, &.{ cwd, f });
+}
+
+fn cwdPath(alloc: Allocator) ![]u8 {
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const n = try std.Io.Dir.cwd().realPathFile(global.io(), ".", &buf);
+    return try alloc.dupe(u8, buf[0..n]);
+}
+
+fn runInner(alloc: Allocator, opts: Options, stderr: *std.Io.Writer) !u8 {
+    const op = resolveOp(alloc, opts) catch |err| {
+        switch (err) {
+            error.OutOfMemory => return err,
+            error.MultipleOps => try stderr.print("error: only one of --set, --unset, --add, --remove may be used\n", .{}),
+            error.MissingValue => try stderr.print("error: expected key=value\n", .{}),
+            error.UnknownKey => {
+                const raw = opts.set orelse opts.unset orelse opts.add orelse opts.remove.?;
+                const key = if (opts.unset != null) raw else raw[0 .. std.mem.indexOfScalar(u8, raw, '=') orelse raw.len];
+                try stderr.print("error: unknown config option: {s}\n", .{key});
+            },
+            error.InvalidValue => {
+                const raw = opts.set orelse opts.add orelse opts.remove.?;
+                const idx = std.mem.indexOfScalar(u8, raw, '=').?;
+                try stderr.print("error: invalid value for {s}: {s}\n", .{ raw[0..idx], raw[idx + 1 ..] });
+            },
+            error.RepeatableKey => {
+                const raw = opts.set.?;
+                const key = raw[0..std.mem.indexOfScalar(u8, raw, '=').?];
+                try stderr.print("error: {s} can be repeated; use --add, --remove or --unset\n", .{key});
+            },
+        }
+        return 1;
+    };
+    if (op) |o| return runOp(alloc, opts, o, stderr);
+
     // We require libc because we want to use std.c.environ for envp
     // and not have to build that ourselves. We can remove this
     // limitation later but Ghostty already heavily requires libc
@@ -80,7 +251,7 @@ fn runInner(alloc: Allocator, stderr: *std.Io.Writer) !u8 {
     defer config.deinit();
 
     // Find the preferred path.
-    const path = try configpkg.preferredDefaultFilePath(alloc);
+    const path = try filePath(alloc, opts) orelse try configpkg.preferredDefaultFilePath(alloc);
     defer alloc.free(path);
 
     // We don't currently support Windows because we use the exec syscall.
@@ -159,4 +330,46 @@ fn runInner(alloc: Allocator, stderr: *std.Io.Writer) !u8 {
         .{ path, path },
     );
     return 1;
+}
+
+test "resolveOp" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    try testing.expect((try resolveOp(alloc, .{})) == null);
+
+    const set = (try resolveOp(alloc, .{ .set = "font-size=14" })).?;
+    try testing.expectEqualStrings("font-size", set.set.key);
+    try testing.expectEqualStrings("14", set.set.value);
+
+    const add = (try resolveOp(alloc, .{ .add = "keybind=ctrl+a=new_tab" })).?;
+    try testing.expectEqualStrings("keybind", add.add.key);
+    try testing.expectEqualStrings("ctrl+a=new_tab", add.add.value);
+
+    const unset = (try resolveOp(alloc, .{ .unset = "font-size" })).?;
+    try testing.expectEqualStrings("font-size", unset.unset);
+
+    try testing.expectError(error.MultipleOps, resolveOp(alloc, .{ .set = "font-size=14", .unset = "font-size" }));
+    try testing.expectError(error.MissingValue, resolveOp(alloc, .{ .set = "font-size" }));
+    try testing.expectError(error.UnknownKey, resolveOp(alloc, .{ .set = "nope=1" }));
+    try testing.expectError(error.InvalidValue, resolveOp(alloc, .{ .set = "font-size=abc" }));
+    try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "keybind=ctrl+a=new_tab" }));
+    try testing.expectError(error.RepeatableKey, resolveOp(alloc, .{ .set = "palette=1=#ff0000" }));
+}
+
+test "filePath" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    try testing.expect((try filePath(alloc, .{})) == null);
+
+    const abs = if (comptime builtin.os.tag == .windows) "C:\\x\\config" else "/x/config";
+    const got_abs = (try filePath(alloc, .{ .file = abs })).?;
+    defer alloc.free(got_abs);
+    try testing.expectEqualStrings(abs, got_abs);
+
+    const got_rel = (try filePath(alloc, .{ .file = "config" })).?;
+    defer alloc.free(got_rel);
+    try testing.expect(std.fs.path.isAbsolute(got_rel));
+    try testing.expectEqualStrings("config", std.fs.path.basename(got_rel));
 }
