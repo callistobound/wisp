@@ -49,6 +49,14 @@ pub fn applyToFile(io: std.Io, alloc: Allocator, path: []const u8, op: Op) !void
     defer dir.close(io);
     const base = std.fs.path.basename(target);
 
+    // A missing realpath may be a dangling link; replacing it would drop it.
+    if (real == null) {
+        var link_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        if (dir.readLink(io, base, &link_buf)) |_| {
+            return error.DanglingSymlink;
+        } else |_| {}
+    }
+
     var perms: std.Io.File.Permissions = .default_file;
     const src: []u8 = if (real != null) src: {
         const st = try dir.statFile(io, base, .{});
@@ -404,4 +412,32 @@ test "file_edit: applyToFile keeps permissions" {
 
     const stat = try td.dir.statFile(testing.io, "a.ghostty", .{});
     try testing.expectEqual(@as(u32, 0o600), stat.permissions.toMode() & 0o777);
+}
+
+test "file_edit: applyToFile refuses a dangling symlink" {
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try td.dir.symLink(testing.io, "real.ghostty", "link.ghostty", .{});
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try testing.expectError(
+        error.DanglingSymlink,
+        applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "link.ghostty"), set("font-size", "14")),
+    );
+    var link_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    _ = try td.dir.readLink(testing.io, "link.ghostty", &link_buf);
+    try testing.expectError(error.FileNotFound, td.dir.statFile(testing.io, "real.ghostty", .{}));
+}
+
+test "file_edit: applyToFile skips a no-op write" {
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try testWrite(&td, "a.ghostty", "a = 1\n", .default_file);
+    const before = try td.dir.statFile(testing.io, "a.ghostty", .{});
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "a.ghostty"), .{ .unset = "font-size" });
+
+    const after = try td.dir.statFile(testing.io, "a.ghostty", .{});
+    try testing.expectEqual(before.inode, after.inode);
 }
