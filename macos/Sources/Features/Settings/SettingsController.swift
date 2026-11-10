@@ -13,13 +13,15 @@ class SettingsController: NSWindowController, NSWindowDelegate {
         window.title = "Settings"
         window.contentMinSize = NSSize(width: 720, height: 480)
         window.isReleasedWhenClosed = false
-        window.setFrameAutosaveName("SettingsWindow")
 
         // Don't let the SwiftUI content constrain the window size.
         let hostingView = NSHostingView(rootView: SettingsView())
         hostingView.sizingOptions = []
         window.contentView = hostingView
+
+        // Center first; the autosave name then restores any saved frame.
         window.center()
+        window.setFrameAutosaveName("SettingsWindow")
 
         super.init(window: window)
         window.delegate = self

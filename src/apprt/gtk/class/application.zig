@@ -1176,7 +1176,15 @@ pub const Application = extern struct {
 
     fn syncActionAccelerators(self: *Self) void {
         self.syncActionAccelerator("app.quit", .{ .quit = {} });
-        self.syncActionAccelerator("app.open-config::os-open", .{ .open_config = .os_open });
+        // Settings falls back to os_open on GTK, so prefer its (default) trigger.
+        const settings: input.Binding.Action = .{ .open_config = .settings };
+        self.syncActionAccelerator(
+            "app.open-config::os-open",
+            if (self.private().config.get().keybind.set.getTrigger(settings) != null)
+                settings
+            else
+                .{ .open_config = .os_open },
+        );
         self.syncActionAccelerator("app.open-config::new-window", .{ .open_config = .new_window });
         self.syncActionAccelerator("app.reload-config", .{ .reload_config = {} });
         self.syncActionAccelerator("win.toggle-inspector", .{ .inspector = .toggle });
