@@ -5,6 +5,7 @@ const assert = std.debug.assert;
 const Config = @import("Config.zig");
 const RunStep = std.Build.Step.Run;
 const SharedDeps = @import("SharedDeps.zig");
+const installSymlink = @import("install_symlink.zig").installSymlink;
 
 steps: []*std.Build.Step,
 
@@ -124,7 +125,7 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
         const run = b.addRunArtifact(build_data_exe);
         run.addArg("+fish");
         const wf = b.addWriteFiles();
-        _ = wf.addCopyFile(run.captureStdOut(.{}), "ghostty.fish");
+        _ = wf.addCopyFile(run.captureStdOut(.{}), "wisp.fish");
 
         const install_step = b.addInstallDirectory(.{
             .source_dir = wf.getDirectory(),
@@ -132,6 +133,18 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
             .install_subdir = "share/fish/vendor_completions.d",
         });
         try steps.append(b.allocator, &install_step.step);
+
+        // fish autoloads completions by command name.
+        if (cfg.target.result.os.tag != .windows) try steps.append(
+            b.allocator,
+            installSymlink(
+                b,
+                "wisp.fish",
+                .install_prefix,
+                "share/fish/vendor_completions.d/ghostty.fish",
+                &install_step.step,
+            ),
+        );
     }
 
     // zsh shell completions
@@ -139,7 +152,7 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
         const run = b.addRunArtifact(build_data_exe);
         run.addArg("+zsh");
         const wf = b.addWriteFiles();
-        _ = wf.addCopyFile(run.captureStdOut(.{}), "_ghostty");
+        _ = wf.addCopyFile(run.captureStdOut(.{}), "_wisp");
 
         const install_step = b.addInstallDirectory(.{
             .source_dir = wf.getDirectory(),
@@ -154,7 +167,7 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
         const run = b.addRunArtifact(build_data_exe);
         run.addArg("+bash");
         const wf = b.addWriteFiles();
-        _ = wf.addCopyFile(run.captureStdOut(.{}), "ghostty.bash");
+        _ = wf.addCopyFile(run.captureStdOut(.{}), "wisp.bash");
 
         const install_step = b.addInstallDirectory(.{
             .source_dir = wf.getDirectory(),
@@ -162,6 +175,18 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
             .install_subdir = "share/bash-completion/completions",
         });
         try steps.append(b.allocator, &install_step.step);
+
+        // bash-completion loads completions by command name.
+        if (cfg.target.result.os.tag != .windows) try steps.append(
+            b.allocator,
+            installSymlink(
+                b,
+                "wisp.bash",
+                .install_prefix,
+                "share/bash-completion/completions/ghostty.bash",
+                &install_step.step,
+            ),
+        );
     }
 
     // Vim and Neovim plugin
@@ -261,7 +286,7 @@ fn addLinuxAppResources(
     });
 
     // How the files below launch Ghostty. See -Dinstalled-exe-path.
-    const exe = cfg.installed_exe_path orelse "ghostty";
+    const exe = cfg.installed_exe_path orelse "wisp";
 
     // Variables used by the templates.
     // Fields are nullable since unused fields trigger a build failure.

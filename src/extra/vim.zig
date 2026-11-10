@@ -10,7 +10,7 @@ pub const ftdetect =
     \\"
     \\" THIS FILE IS AUTO-GENERATED
     \\
-    \\au BufRead,BufNewFile */ghostty/config,*/*.ghostty/config,*/ghostty/themes/*,*.ghostty setf ghostty
+    \\au BufRead,BufNewFile */wisp/config,*/wisp/config.ghostty,*/wisp/themes/*,*/ghostty/config,*/*.ghostty/config,*/ghostty/themes/*,*.ghostty setf ghostty
     \\
 ;
 pub const ftplugin =
@@ -31,8 +31,8 @@ pub const ftplugin =
     \\" Use syntax keywords for completion
     \\setlocal omnifunc=syntaxcomplete#Complete
     \\
-    \\" Ask ghostty to explain config keywords
-    \\setlocal keywordprg=ghostty\ +explain-config
+    \\" Ask wisp to explain config keywords
+    \\setlocal keywordprg=wisp\ +explain-config
     \\
     \\let b:undo_ftplugin = 'setl cms< isk< ofu< kp<'
     \\
@@ -54,7 +54,7 @@ pub const compiler =
     \\endif
     \\let current_compiler = "ghostty"
     \\
-    \\CompilerSet makeprg=ghostty\ +validate-config\ --config-file=%:S
+    \\CompilerSet makeprg=wisp\ +validate-config\ --config-file=%:S
     \\CompilerSet errorformat=%f:%l:%m,%m
     \\
 ;
@@ -118,4 +118,18 @@ fn writeSyntax(writer: *std.Io.Writer) !void {
 
 test {
     _ = syntax;
+}
+
+test "ftdetect matches wisp config paths" {
+    const testing = std.testing;
+    try testing.expect(std.mem.indexOf(u8, ftdetect, "*/wisp/config,") != null);
+    try testing.expect(std.mem.indexOf(u8, ftdetect, "*/wisp/config.ghostty,") != null);
+    try testing.expect(std.mem.indexOf(u8, ftdetect, "*/wisp/themes/*,") != null);
+    try testing.expect(std.mem.indexOf(u8, ftdetect, " setf ghostty\n") != null);
+}
+
+test "ftplugin and compiler run wisp" {
+    const testing = std.testing;
+    try testing.expect(std.mem.indexOf(u8, ftplugin, "keywordprg=wisp\\ +explain-config") != null);
+    try testing.expect(std.mem.indexOf(u8, compiler, "makeprg=wisp\\ +validate-config") != null);
 }

@@ -1,8 +1,8 @@
-% GHOSTTY(1) Version @@VERSION@@ | Ghostty terminal emulator
+% WISP(1) Version @@VERSION@@ | Wisp terminal emulator
 
 # NAME
 
-**ghostty** - Ghostty terminal emulator
+**wisp** - Wisp terminal emulator
 
 # DESCRIPTION
 

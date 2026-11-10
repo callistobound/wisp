@@ -3,6 +3,7 @@ const Ghostty = @This();
 const std = @import("std");
 const Config = @import("Config.zig");
 const SharedDeps = @import("SharedDeps.zig");
+const installSymlink = @import("install_symlink.zig").installSymlink;
 
 /// The primary Ghostty executable.
 exe: *std.Build.Step.Compile,
@@ -10,9 +11,12 @@ exe: *std.Build.Step.Compile,
 /// The install step for the executable.
 install_step: *std.Build.Step.InstallArtifact,
 
+/// The step that installs the `ghostty` alias, if any.
+alias_step: ?*std.Build.Step,
+
 pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty {
     const exe: *std.Build.Step.Compile = b.addExecutable(.{
-        .name = "ghostty",
+        .name = "wisp",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = cfg.target,
@@ -51,9 +55,22 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
         else => {},
     }
 
+    // Install `ghostty` as an alias so existing invocations keep working.
+    const alias_step: ?*std.Build.Step = switch (cfg.target.result.os.tag) {
+        .windows => null,
+        else => installSymlink(
+            b,
+            "wisp",
+            .install_bin,
+            "ghostty",
+            &install_step.step,
+        ),
+    };
+
     return .{
         .exe = exe,
         .install_step = install_step,
+        .alias_step = alias_step,
     };
 }
 
@@ -61,6 +78,7 @@ pub fn init(b: *std.Build, cfg: *const Config, deps: *const SharedDeps) !Ghostty
 pub fn install(self: *const Ghostty) void {
     const b = self.install_step.step.owner;
     b.getInstallStep().dependOn(&self.install_step.step);
+    if (self.alias_step) |step| b.getInstallStep().dependOn(step);
 }
 
 /// If we're in NixOS but not in the shell environment then we issue

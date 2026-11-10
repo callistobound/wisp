@@ -36,21 +36,23 @@ fn writeCompletions(writer: *std.Io.Writer) !void {
         try writer.writeAll("\"\n");
     }
 
-    try writer.writeAll("complete -c ghostty -f\n");
+    try writer.writeAll("complete -c wisp -f\n");
+    // ghostty is an alias for wisp.
+    try writer.writeAll("complete -c ghostty -w wisp\n");
 
-    try writer.writeAll("complete -c ghostty -s e -l help -f\n");
-    try writer.writeAll("complete -c ghostty -n \"not __fish_seen_subcommand_from $commands\" -l version -f\n");
+    try writer.writeAll("complete -c wisp -s e -l help -f\n");
+    try writer.writeAll("complete -c wisp -n \"not __fish_seen_subcommand_from $commands\" -l version -f\n");
 
     inline for (@typeInfo(Config).@"struct".field_names, @typeInfo(Config).@"struct".field_types) |field, field_type| {
         if (field[0] == '_') continue;
 
-        try writer.writeAll("complete -c ghostty -n \"not __fish_seen_subcommand_from $commands\" -l ");
+        try writer.writeAll("complete -c wisp -n \"not __fish_seen_subcommand_from $commands\" -l ");
         try writer.writeAll(field);
         try writer.writeAll(if (field_type != bool) " -r" else " ");
         if (std.mem.startsWith(u8, field, "font-family"))
-            try writer.writeAll(" -f  -a \"(ghostty +list-fonts | grep '^[A-Z]')\"")
+            try writer.writeAll(" -f  -a \"(wisp +list-fonts | grep '^[A-Z]')\"")
         else if (std.mem.eql(u8, "theme", field))
-            try writer.writeAll(" -f -a \"(ghostty +list-themes | sed -E 's/^(.*) \\(.*\\$/\\1/')\"")
+            try writer.writeAll(" -f -a \"(wisp +list-themes | sed -E 's/^(.*) \\(.*\\$/\\1/')\"")
         else if (std.mem.eql(u8, "working-directory", field))
             try writer.writeAll(" -f -k -a \"(__fish_complete_directories)\"")
         else {
@@ -93,7 +95,7 @@ fn writeCompletions(writer: *std.Io.Writer) !void {
     }
 
     {
-        try writer.writeAll("complete -c ghostty -n \"string match -q -- '+*' (commandline -pt)\" -f -a \"");
+        try writer.writeAll("complete -c wisp -n \"string match -q -- '+*' (commandline -pt)\" -f -a \"");
         var count: usize = 0;
         for (@typeInfo(Action).@"enum".field_names) |field| {
             if (count > 0) try writer.writeAll(" ");
@@ -111,7 +113,7 @@ fn writeCompletions(writer: *std.Io.Writer) !void {
         const options = @field(Action, field).options();
         inline for (@typeInfo(options).@"struct".field_names, @typeInfo(options).@"struct".field_types) |opt, opt_type| {
             if (opt[0] == '_') continue;
-            try writer.writeAll("complete -c ghostty -n \"__fish_seen_subcommand_from +" ++ field ++ "\" -l ");
+            try writer.writeAll("complete -c wisp -n \"__fish_seen_subcommand_from +" ++ field ++ "\" -l ");
             try writer.writeAll(opt);
             try writer.writeAll(if (opt_type != bool) " -r" else "");
 
@@ -199,4 +201,18 @@ test "getDescription" {
         const result = getDescription(input);
         try testing.expectEqualStrings(expected, result);
     }
+}
+
+test "completes wisp and ghostty" {
+    const testing = std.testing;
+    try testing.expect(std.mem.indexOf(u8, completions, "\ncomplete -c ghostty -w wisp\n") != null);
+    var it = std.mem.splitScalar(u8, completions, '\n');
+    var count: usize = 0;
+    while (it.next()) |line| {
+        if (!std.mem.startsWith(u8, line, "complete ")) continue;
+        if (std.mem.eql(u8, line, "complete -c ghostty -w wisp")) continue;
+        try testing.expect(std.mem.startsWith(u8, line, "complete -c wisp "));
+        count += 1;
+    }
+    try testing.expect(count > 0);
 }

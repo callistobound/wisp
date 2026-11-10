@@ -7,4 +7,4 @@ Actions=RunGhosttyDir
 [Desktop Action RunGhosttyDir]
 Name=Open Ghostty Here
 Icon=com.jamesboehmer.wisp
-Exec=ghostty +new-window --working-directory=%F
+Exec=wisp +new-window --working-directory=%F

@@ -13,7 +13,7 @@ const global = @import("../global.zig");
 const log = std.log.scoped(.ssh);
 
 const usage =
-    \\Usage: ghostty +ssh [flags] [--] <ssh args...>
+    \\Usage: wisp +ssh [flags] [--] <ssh args...>
     \\
     \\Flags:
     \\  --forward-env[=bool]  Send Ghostty env vars to the remote. Default: true.

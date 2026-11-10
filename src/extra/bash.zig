@@ -333,7 +333,16 @@ fn writeBashCompletions(writer: *std.Io.Writer) !void {
         \\  return 0
         \\}
         \\
-        \\complete -o nospace -o bashdefault -F _ghostty ghostty
+        \\complete -o nospace -o bashdefault -F _ghostty wisp ghostty
         \\
     );
+}
+
+test "completes wisp and ghostty" {
+    const testing = std.testing;
+    try testing.expect(std.mem.indexOf(
+        u8,
+        completions,
+        "complete -o nospace -o bashdefault -F _ghostty wisp ghostty\n",
+    ) != null);
 }

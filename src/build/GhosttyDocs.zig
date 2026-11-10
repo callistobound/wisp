@@ -5,6 +5,7 @@ const GhosttyDocs = @This();
 const std = @import("std");
 const Config = @import("Config.zig");
 const SharedDeps = @import("SharedDeps.zig");
+const installSymlink = @import("install_symlink.zig").installSymlink;
 
 steps: []*std.Build.Step,
 
@@ -19,13 +20,13 @@ pub fn init(
         name: []const u8,
         section: []const u8,
     }{
-        .{ .name = "ghostty", .section = "1" },
-        .{ .name = "ghostty", .section = "5" },
+        .{ .name = "wisp", .section = "1" },
+        .{ .name = "wisp", .section = "5" },
     };
 
     inline for (manpages) |manpage| {
         const generate_markdown = b.addExecutable(.{
-            .name = "mdgen_" ++ manpage.name ++ "_" ++ manpage.section,
+            .name = "mdgen_ghostty_" ++ manpage.section,
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main.zig"),
                 .target = b.graph.host,
@@ -40,7 +41,7 @@ pub fn init(
             var copy = deps.config.*;
             copy.exe_entrypoint = @field(
                 Config.ExeEntrypoint,
-                "mdgen_" ++ manpage.name ++ "_" ++ manpage.section,
+                "mdgen_ghostty_" ++ manpage.section,
             );
             break :config copy;
         };
@@ -82,10 +83,23 @@ pub fn init(
         });
         generate_manpage.addFileArg(markdown_output);
 
-        try steps.append(b.allocator, &b.addInstallFile(
+        const install_manpage = b.addInstallFile(
             generate_manpage.captureStdOut(.{}),
             "share/man/man" ++ manpage.section ++ "/" ++ manpage.name ++ "." ++ manpage.section,
-        ).step);
+        );
+        try steps.append(b.allocator, &install_manpage.step);
+
+        // Keep `man ghostty` working.
+        if (deps.config.target.result.os.tag != .windows) try steps.append(
+            b.allocator,
+            installSymlink(
+                b,
+                manpage.name ++ "." ++ manpage.section,
+                .install_prefix,
+                "share/man/man" ++ manpage.section ++ "/ghostty." ++ manpage.section,
+                &install_manpage.step,
+            ),
+        );
     }
 
     return .{ .steps = steps.items };

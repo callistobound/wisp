@@ -1,8 +1,8 @@
-% GHOSTTY(5) Version @@VERSION@@ | Ghostty terminal emulator configuration file
+% WISP(5) Version @@VERSION@@ | Wisp terminal emulator configuration file
 
 # NAME
 
-**ghostty** - Ghostty terminal emulator configuration file
+**wisp** - Wisp terminal emulator configuration file
 
 # DESCRIPTION
 

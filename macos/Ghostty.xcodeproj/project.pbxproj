@@ -291,6 +291,7 @@
 				A5B3052E299BEAAA0047F10C /* Frameworks */,
 				A5B3052F299BEAAA0047F10C /* Resources */,
 				819324572F24E74E00A9ED8F /* Copy DockTilePlugin */,
+				FC501E0C2F46B410007AE49D /* Link ghostty Alias */,
 			);
 			buildRules = (
 			);
@@ -425,6 +426,27 @@
 			shellScript = "[[ -z \"$GITHUB_ACTIONS\" ]] || exit 0;\n\nSWIFTLINT=\"\"\nif command -v swiftlint >/dev/null 2>&1; then\n    SWIFTLINT=\"$(command -v swiftlint)\"\nelif [[ -f \"/opt/homebrew/bin/swiftlint\" ]]; then\n    SWIFTLINT=\"/opt/homebrew/bin/swiftlint\"\nfi\n\nif [[ -n \"$SWIFTLINT\" ]]; then\n    \"$SWIFTLINT\" lint --quiet\nfi\n";
 			showEnvVarsInLog = 0;
 		};
+		FC501E0C2F46B410007AE49D /* Link ghostty Alias */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Link ghostty Alias";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/ghostty",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Keep `ghostty` working as a CLI alias. Runs before code signing.\nln -sf \"$EXECUTABLE_NAME\" \"$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/ghostty\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -548,7 +570,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				EXECUTABLE_NAME = ghostty;
+				EXECUTABLE_NAME = wisp;
 				GCC_OPTIMIZATION_LEVEL = fast;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Ghostty-Info.plist";
@@ -764,7 +786,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/wisp";
 			};
 			name = Debug;
 		};
@@ -787,7 +809,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/wisp";
 			};
 			name = Release;
 		};
@@ -810,7 +832,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wisp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/wisp";
 			};
 			name = ReleaseLocal;
 		};
@@ -948,7 +970,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				EXECUTABLE_NAME = ghostty;
+				EXECUTABLE_NAME = wisp;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Ghostty-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Wisp[DEBUG]";
@@ -1003,7 +1025,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				EXECUTABLE_NAME = ghostty;
+				EXECUTABLE_NAME = wisp;
 				GCC_OPTIMIZATION_LEVEL = fast;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Ghostty-Info.plist";
