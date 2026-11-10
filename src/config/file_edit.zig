@@ -6,6 +6,9 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const cli = @import("../cli.zig");
 const internal_os = @import("../os/main.zig");
+const Config = @import("Config.zig");
+const Key = @import("key.zig").Key;
+const schema = @import("schema.zig");
 const testing = std.testing;
 
 const bom = "\xEF\xBB\xBF";
@@ -24,6 +27,42 @@ pub const Op = union(enum) {
 };
 
 pub const Error = Allocator.Error || error{InvalidValue};
+
+pub const ValidateError = error{ UnknownKey, InvalidValue, RepeatableKey } || Allocator.Error;
+
+/// Check that `op` names a real key and, for set and add, a parsable value.
+/// Set also rejects repeatable keys.
+pub fn validate(alloc: Allocator, op: Op) ValidateError!void {
+    const entry: Entry = switch (op) {
+        .unset => |k| {
+            if (std.meta.stringToEnum(Key, k) == null) return error.UnknownKey;
+            return;
+        },
+        .set, .add, .remove => |e| e,
+    };
+    const key = std.meta.stringToEnum(Key, entry.key) orelse return error.UnknownKey;
+    if (op == .set and schema.isRepeatable(key)) return error.RepeatableKey;
+    if (op == .remove) return;
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    cli.args.parseIntoField(Config, cfg._arena.?.allocator(), &cfg, entry.key, entry.value) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return error.InvalidValue,
+    };
+}
+
+/// The 1-based line of the last entry for `key` (matching `value` if given).
+pub fn findEntry(src: []const u8, key: []const u8, value: ?[]const u8) ?usize {
+    var found: ?usize = null;
+    var n: usize = 0;
+    var it: LineIter = .{ .src = src };
+    while (it.next()) |l| {
+        n += 1;
+        if (l.matches(key, value)) found = n;
+    }
+    return found;
+}
 
 /// Apply `op` to `src`. The caller owns the result.
 pub fn apply(alloc: Allocator, src: []const u8, op: Op) Error![]u8 {
@@ -482,4 +521,23 @@ test "file_edit: applyToFile skips a no-op write" {
 
     const after = try td.dir.statFile(testing.io, "a.ghostty", .{});
     try testing.expectEqual(before.inode, after.inode);
+}
+
+test "file_edit: validate" {
+    const alloc = testing.allocator;
+    try validate(alloc, set("font-size", "14"));
+    try testing.expectError(error.UnknownKey, validate(alloc, set("nope", "1")));
+    try testing.expectError(error.InvalidValue, validate(alloc, set("font-size", "abc")));
+    try testing.expectError(error.RepeatableKey, validate(alloc, set("keybind", "ctrl+a=new_tab")));
+    try validate(alloc, .{ .add = .{ .key = "keybind", .value = "ctrl+a=new_tab" } });
+    try validate(alloc, .{ .unset = "font-size" });
+    try testing.expectError(error.UnknownKey, validate(alloc, .{ .unset = "nope" }));
+}
+
+test "file_edit: findEntry" {
+    const src = "# keybind = a=b\nkeybind = a=b\nx = 1\nkeybind = c=d\n";
+    try testing.expectEqual(@as(?usize, 2), findEntry(src, "keybind", "a=b"));
+    try testing.expectEqual(@as(?usize, 4), findEntry(src, "keybind", "c=d"));
+    try testing.expectEqual(@as(?usize, null), findEntry(src, "keybind", "z=z"));
+    try testing.expectEqual(@as(?usize, 3), findEntry(src, "x", null));
 }

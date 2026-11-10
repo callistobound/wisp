@@ -5,7 +5,9 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const Config = @import("Config.zig");
 const Key = @import("key.zig").Key;
 const Source = @import("source.zig").Source;
+const file_edit = @import("file_edit.zig");
 const formatter = @import("formatter.zig");
+const global = @import("../global.zig");
 const help_strings = @import("help_strings");
 
 pub const Kind = enum(c_int) { bool, @"enum", int, float, color, string, path, repeatable, keybind, other };
@@ -94,6 +96,10 @@ pub const Option = struct {
     /// Same, from Config.default.
     defaults: []const [:0]const u8,
     source: ?Source,
+    /// Parallel to `values` for repeatable and keybind kinds, else empty.
+    /// Null means default. Matches the formatted text, so a line written
+    /// as `a = b` rather than `a=b` is not found.
+    entry_sources: []const ?Source,
 };
 
 pub const Schema = struct {
@@ -112,19 +118,25 @@ pub const Schema = struct {
 
         const keys = std.enums.values(Key);
         const options = try a.alloc(Option, keys.len);
+        const loaded = config.loadedFiles();
         for (keys, options) |key, *opt| {
+            const kind = kindOf(key);
+            const values = try entries(a, config, key);
             opt.* = .{
                 .key = try a.dupeSentinel(u8, @tagName(key), 0),
-                .kind = kindOf(key),
+                .kind = kind,
                 .help = try helpOf(a, key),
                 .enum_values = enumValues(key),
-                .values = try entries(a, config, key),
+                .values = values,
                 .defaults = try entries(a, &def, key),
                 .source = if (config.sourceOf(key)) |s| try s.clone(a) else null,
+                .entry_sources = if (kind == .repeatable or kind == .keybind)
+                    try entrySources(a, loaded, @tagName(key), values)
+                else
+                    &.{},
             };
         }
 
-        const loaded = config.loadedFiles();
         const files = try a.alloc([:0]const u8, loaded.len);
         for (loaded, files) |src, *dst| dst.* = try a.dupeSentinel(u8, src, 0);
 
@@ -135,6 +147,32 @@ pub const Schema = struct {
         self.arena.deinit();
     }
 };
+
+/// Find the last loaded file with each entry, reading files from disk.
+fn entrySources(
+    a: Allocator,
+    loaded: []const []const u8,
+    key: []const u8,
+    values: []const [:0]const u8,
+) Allocator.Error![]const ?Source {
+    const out = try a.alloc(?Source, values.len);
+    @memset(out, null);
+    if (values.len == 0) return out;
+
+    // Walk files last to first, filling each entry from the latest hit.
+    var i = loaded.len;
+    while (i > 0) {
+        i -= 1;
+        const path = loaded[i];
+        const src = std.Io.Dir.cwd().readFileAlloc(global.io(), path, a, .unlimited) catch continue;
+        for (values, out) |v, *dst| {
+            if (dst.* != null) continue;
+            const line = file_edit.findEntry(src, key, v) orelse continue;
+            dst.* = .{ .file = .{ .path = try a.dupe(u8, path), .line = line } };
+        }
+    }
+    return out;
+}
 
 fn helpOf(a: Allocator, key: Key) Allocator.Error![:0]const u8 {
     @setEvalBranchQuota(10_000);
@@ -233,4 +271,40 @@ test "schema: values, defaults and source" {
     try testing.expectEqual(@as(usize, 1), schema.files.len);
     try testing.expectEqualStrings(path, schema.files[0]);
     try testing.expect(find(&schema, .@"font-size").help.len > 0);
+}
+
+test "schema: keybind entry sources" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const internal_os = @import("../os/main.zig");
+
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try td.dir.writeFile(testing.io, .{
+        .sub_path = "config.ghostty",
+        .data = "keybind = ctrl+a=new_tab\n",
+    });
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = buf[0..try td.dir.realPathFile(testing.io, "config.ghostty", &buf)];
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.loadFile(alloc, path);
+    try cfg.finalize();
+
+    var schema = try Schema.init(alloc, &cfg);
+    defer schema.deinit();
+
+    const kb = find(&schema, .keybind);
+    try testing.expectEqual(kb.values.len, kb.entry_sources.len);
+    var user = false;
+    var dflt = false;
+    for (kb.values, kb.entry_sources) |v, s| {
+        if (std.mem.eql(u8, v, "ctrl+a=new_tab")) {
+            try testing.expectEqual(@as(usize, 1), s.?.file.line);
+            user = true;
+        } else if (s == null) dflt = true;
+    }
+    try testing.expect(user and dflt);
+    try testing.expectEqual(@as(usize, 0), find(&schema, .@"font-size").entry_sources.len);
 }

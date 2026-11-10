@@ -109,28 +109,22 @@ fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
     if (n > 1) return error.MultipleOps;
 
     if (opts.unset) |key| {
-        if (std.meta.stringToEnum(Key, key) == null) return error.UnknownKey;
-        return .{ .unset = key };
+        const op: file_edit.Op = .{ .unset = key };
+        try file_edit.validate(alloc, op);
+        return op;
     }
 
     const raw = opts.set orelse opts.add orelse opts.remove.?;
     const idx = std.mem.indexOfScalar(u8, raw, '=') orelse return error.MissingValue;
     const entry: file_edit.Entry = .{ .key = raw[0..idx], .value = raw[idx + 1 ..] };
-    const key = std.meta.stringToEnum(Key, entry.key) orelse return error.UnknownKey;
-    if (opts.set != null and configpkg.schema.isRepeatable(key)) return error.RepeatableKey;
-
-    if (opts.remove == null) {
-        var cfg = try Config.default(alloc);
-        defer cfg.deinit();
-        args.parseIntoField(Config, cfg._arena.?.allocator(), &cfg, entry.key, entry.value) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            else => return error.InvalidValue,
-        };
-    }
-
-    if (opts.set != null) return .{ .set = entry };
-    if (opts.add != null) return .{ .add = entry };
-    return .{ .remove = entry };
+    const op: file_edit.Op = if (opts.set != null)
+        .{ .set = entry }
+    else if (opts.add != null)
+        .{ .add = entry }
+    else
+        .{ .remove = entry };
+    try file_edit.validate(alloc, op);
+    return op;
 }
 
 fn runOp(
