@@ -16,6 +16,7 @@
 extern "C" {
 #endif
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -31,6 +32,11 @@ typedef SSIZE_T ssize_t;
 // Macros
 
 #define GHOSTTY_SUCCESS 0
+
+// Last entry of every enum, forcing int sizing. Matches ghostty/vt/types.h.
+#ifndef GHOSTTY_ENUM_MAX_VALUE
+#define GHOSTTY_ENUM_MAX_VALUE INT_MAX
+#endif
 
 // Symbol visibility for shared library builds. On Windows, functions
 // are exported from the DLL when building and imported when consuming.
@@ -76,6 +82,7 @@ typedef SSIZE_T ssize_t;
 // Opaque types
 typedef void* ghostty_app_t;
 typedef void* ghostty_config_t;
+typedef void* ghostty_config_schema_t;
 typedef void* ghostty_surface_t;
 typedef void* ghostty_inspector_t;
 
@@ -607,6 +614,77 @@ typedef enum {
   GHOSTTY_CONFIG_FULLSCREEN_NON_NATIVE_VISIBLE_MENU,
   GHOSTTY_CONFIG_FULLSCREEN_NON_NATIVE_PADDED_NOTCH,
 } ghostty_config_fullscreen_e;
+
+// config.schema.Kind
+typedef enum {
+  GHOSTTY_CONFIG_KIND_BOOL,
+  GHOSTTY_CONFIG_KIND_ENUM,
+  GHOSTTY_CONFIG_KIND_INT,
+  GHOSTTY_CONFIG_KIND_FLOAT,
+  GHOSTTY_CONFIG_KIND_COLOR,
+  GHOSTTY_CONFIG_KIND_STRING,
+  GHOSTTY_CONFIG_KIND_PATH,
+  GHOSTTY_CONFIG_KIND_REPEATABLE,
+  GHOSTTY_CONFIG_KIND_KEYBIND,
+  GHOSTTY_CONFIG_KIND_OTHER,
+  GHOSTTY_CONFIG_KIND_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
+} ghostty_config_kind_e;
+
+// config.CApi.SourceKind
+typedef enum {
+  GHOSTTY_CONFIG_SOURCE_DEFAULT,
+  GHOSTTY_CONFIG_SOURCE_FILE,
+  GHOSTTY_CONFIG_SOURCE_THEME,
+  GHOSTTY_CONFIG_SOURCE_CLI,
+  GHOSTTY_CONFIG_SOURCE_OTHER,
+  GHOSTTY_CONFIG_SOURCE_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
+} ghostty_config_source_e;
+
+// config.CApi.CSource. path is "" unless FILE or THEME; line is the
+// argument index for CLI.
+typedef struct {
+  ghostty_config_source_e kind;
+  const char* path;
+  uintptr_t line;
+} ghostty_config_source_s;
+
+// config.CApi.COption. Owned by the schema until ghostty_config_schema_free.
+typedef struct {
+  const char* key;
+  ghostty_config_kind_e kind;
+  const char* help;
+  const char* const* enum_values;
+  uintptr_t enum_values_len;
+  const char* const* values;
+  uintptr_t values_len;
+  const char* const* defaults;
+  uintptr_t defaults_len;
+  ghostty_config_source_s source;
+  const ghostty_config_source_s* entry_sources;
+  uintptr_t entry_sources_len;
+} ghostty_config_option_s;
+
+// config.CApi.EditOp
+typedef enum {
+  GHOSTTY_CONFIG_EDIT_SET,
+  GHOSTTY_CONFIG_EDIT_UNSET,
+  GHOSTTY_CONFIG_EDIT_ADD,
+  GHOSTTY_CONFIG_EDIT_REMOVE,
+  GHOSTTY_CONFIG_EDIT_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
+} ghostty_config_edit_op_e;
+
+// config.CApi.EditResult
+typedef enum {
+  GHOSTTY_CONFIG_EDIT_OK,
+  GHOSTTY_CONFIG_EDIT_UNKNOWN_KEY,
+  GHOSTTY_CONFIG_EDIT_INVALID_VALUE,
+  GHOSTTY_CONFIG_EDIT_REPEATABLE_KEY,
+  GHOSTTY_CONFIG_EDIT_DANGLING_SYMLINK,
+  GHOSTTY_CONFIG_EDIT_HARD_LINK,
+  GHOSTTY_CONFIG_EDIT_ACCESS_DENIED,
+  GHOSTTY_CONFIG_EDIT_ERROR,
+  GHOSTTY_CONFIG_EDIT_RESULT_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
+} ghostty_config_edit_result_e;
 
 // apprt.Target.Key
 typedef enum {
@@ -1184,6 +1262,18 @@ GHOSTTY_API bool ghostty_config_key_is_binding(ghostty_config_t, ghostty_input_k
 GHOSTTY_API uint32_t ghostty_config_diagnostics_count(ghostty_config_t);
 GHOSTTY_API ghostty_diagnostic_s ghostty_config_get_diagnostic(ghostty_config_t, uint32_t);
 GHOSTTY_API ghostty_string_s ghostty_config_open_path(void);
+GHOSTTY_API ghostty_config_schema_t GHOSTTY_NULLABLE ghostty_config_schema_new(ghostty_config_t);
+GHOSTTY_API void ghostty_config_schema_free(ghostty_config_schema_t GHOSTTY_NULLABLE);
+GHOSTTY_API uintptr_t ghostty_config_schema_options_len(ghostty_config_schema_t);
+GHOSTTY_API ghostty_config_option_s ghostty_config_schema_option(ghostty_config_schema_t, uintptr_t);
+GHOSTTY_API uintptr_t ghostty_config_schema_files_len(ghostty_config_schema_t);
+GHOSTTY_API const char* ghostty_config_schema_file(ghostty_config_schema_t, uintptr_t);
+GHOSTTY_API ghostty_config_edit_result_e ghostty_config_edit(const char*,
+                                                            ghostty_config_edit_op_e,
+                                                            const char*,
+                                                            uintptr_t,
+                                                            const char* GHOSTTY_NULLABLE,
+                                                            uintptr_t);
 
 GHOSTTY_API ghostty_app_t GHOSTTY_NULLABLE ghostty_app_new(const ghostty_runtime_config_s*,
                                              ghostty_config_t);
