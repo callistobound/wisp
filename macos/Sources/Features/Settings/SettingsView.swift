@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    let openInEditor: (String) -> Void
 
     private enum SidebarItem: Hashable {
         case section(SettingsSection)
@@ -66,7 +67,7 @@ struct SettingsView: View {
                 HStack {
                     Text(file).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     Spacer()
-                    Button("Open in Editor") { NSWorkspace.shared.open(URL(fileURLWithPath: file)) }
+                    Button("Open in Editor") { openInEditor(file) }
                 }
             }
         }

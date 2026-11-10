@@ -28,8 +28,8 @@ class SettingsController: NSWindowController, NSWindowDelegate {
         }
 
         // Don't let the SwiftUI content constrain the window size.
-        if let model {
-            let hostingView = NSHostingView(rootView: SettingsView(model: model))
+        if let ghostty, let model {
+            let hostingView = NSHostingView(rootView: SettingsView(model: model, openInEditor: ghostty.openInEditor))
             hostingView.sizingOptions = []
             window.contentView = hostingView
         }

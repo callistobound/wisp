@@ -11,7 +11,7 @@ enum Shortcut {
         .metaLeft, .metaRight, .capsLock, .fn,
     ]
 
-    /// A trigger like "ctrl+shift+a", or nil for a modifier-only press.
+    /// A trigger like "super+ctrl+a", or nil for a modifier-only press.
     static func trigger(keyCode: UInt16, characters: String?, modifiers: NSEvent.ModifierFlags) -> String? {
         let physical = Ghostty.Input.Key(keyCode: keyCode)
         if let physical, modifierKeys.contains(physical) { return nil }
@@ -25,11 +25,12 @@ enum Shortcut {
             return nil
         }
 
+        // Same order as Trigger.format, so entry sources and removal match.
         var mods = ""
+        if modifiers.contains(.command) { mods += "super+" }
         if modifiers.contains(.control) { mods += "ctrl+" }
         if modifiers.contains(.option) { mods += "alt+" }
         if modifiers.contains(.shift) { mods += "shift+" }
-        if modifiers.contains(.command) { mods += "super+" }
         return mods + name
     }
 

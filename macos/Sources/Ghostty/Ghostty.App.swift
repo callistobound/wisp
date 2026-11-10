@@ -133,9 +133,13 @@ extension Ghostty {
         }
 
         func openConfig() {
-            let str = configPath ?? Ghostty.AllocatedString(ghostty_config_open_path()).string
-            guard !str.isEmpty else { return }
-            let fileURL = URL(fileURLWithPath: str).absoluteString
+            openInEditor(path: configPath ?? Ghostty.AllocatedString(ghostty_config_open_path()).string)
+        }
+
+        /// Open a file in the text editor, as `open_config` does.
+        func openInEditor(path: String) {
+            guard !path.isEmpty else { return }
+            let fileURL = URL(fileURLWithPath: path).absoluteString
             fileURL.withCString { cStr in
                 let action = ghostty_action_open_url_s(
                     kind: GHOSTTY_ACTION_OPEN_URL_KIND_TEXT,

@@ -32,6 +32,16 @@ struct ShortcutTests {
         #expect(t == "ctrl+shift+a")
     }
 
+    @Test func triggerSuperFirst() {
+        let t = Shortcut.trigger(keyCode: UInt16(kVK_ANSI_T), characters: "t", modifiers: [.control, .command])
+        #expect(t == "super+ctrl+t")
+    }
+
+    @Test func displayEitherModifierOrder() {
+        #expect(Shortcut.display("super+ctrl+t") == "⌃⌘T")
+        #expect(Shortcut.display("ctrl+super+t") == "⌃⌘T")
+    }
+
     @Test func triggerModifierOnly() {
         #expect(Shortcut.trigger(keyCode: UInt16(kVK_Shift), characters: nil, modifiers: [.shift]) == nil)
         #expect(Shortcut.trigger(keyCode: UInt16(kVK_Command), characters: "", modifiers: [.command]) == nil)
