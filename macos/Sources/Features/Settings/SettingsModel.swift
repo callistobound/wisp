@@ -45,6 +45,7 @@ final class SettingsModel: ObservableObject {
         self.schema = schema
         options = schema.options
         files = schema.files
+        if let file = selectedFile, !files.contains(file) { selectedFile = nil }
     }
 
     // MARK: - Labels and sections
@@ -113,12 +114,12 @@ final class SettingsModel: ObservableObject {
         return defaultTarget
     }
 
-    /// Warns when the file that set the option loads after `target`.
+    /// Warns when the file that set the option loads after `target`, or `target` isn't loaded yet.
     func overrideWarning(option: SettingsOption, target: String) -> String? {
-        guard case .file(let source, _) = option.source,
-              let targetIndex = files.firstIndex(of: target),
-              let sourceIndex = files.firstIndex(of: source),
-              targetIndex < sourceIndex else { return nil }
+        guard case .file(let source, _) = option.source, source != target else { return nil }
+        if let targetIndex = files.firstIndex(of: target) {
+            guard let sourceIndex = files.firstIndex(of: source), targetIndex < sourceIndex else { return nil }
+        }
         let basename = (source as NSString).lastPathComponent
         return "⚠ \(basename) sets this later and will override it."
     }

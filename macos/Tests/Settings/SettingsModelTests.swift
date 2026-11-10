@@ -69,6 +69,13 @@ struct SettingsModelTests {
         #expect(m.overrideWarning(option: opt, target: "/c/b") == nil)
     }
 
+    @Test func overrideWarningWhenTargetNotLoaded() throws {
+        let m = try model(files: ["/c/b"])
+        let opt = option("font-size", source: .file(path: "/c/b", line: 3))
+        #expect(m.overrideWarning(option: opt, target: "/c/new") == "⚠ b sets this later and will override it.")
+        #expect(m.overrideWarning(option: option("font-size"), target: "/c/new") == nil)
+    }
+
     // MARK: - Filtering
 
     @Test func searchMatchesKeyAndIgnoresSection() throws {
@@ -79,6 +86,13 @@ struct SettingsModelTests {
     }
 
     // MARK: - Integration
+
+    @Test func reloadClearsMissingSelectedFile() throws {
+        let m = try model()
+        m.selectedFile = "/gone"
+        m.reload(config: try TemporaryConfig(""))
+        #expect(m.selectedFile == nil)
+    }
 
     @Test func fileSourceFromConfig() throws {
         let config = try TemporaryConfig("font-size = 15\n")
