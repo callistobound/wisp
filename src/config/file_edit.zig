@@ -72,6 +72,8 @@ fn applyInner(
             try w.writeAll(src[l.start .. l.start + l.indent]);
             try writeEntry(w, op.set);
             try w.writeAll(l.ending);
+        } else if (l.start == 0 and std.mem.startsWith(u8, src, bom)) {
+            try w.writeAll(bom);
         }
     }
 
@@ -281,4 +283,33 @@ test "file_edit: output parses back with LineIterator" {
         try std.testing.expectEqualStrings(want, iter.next().?);
         try std.testing.expect(iter.next() == null);
     }
+}
+
+test "file_edit: removal keeps BOM on the first line" {
+    try expectApply(
+        "\xEF\xBB\xBFfont-size = 12\na = 1\n",
+        .{ .unset = "font-size" },
+        "\xEF\xBB\xBFa = 1\n",
+    );
+    try expectApply(
+        "\xEF\xBB\xBFkeybind = a=b\nkeybind = c=d\n",
+        .{ .remove = .{ .key = "keybind", .value = "a=b" } },
+        "\xEF\xBB\xBFkeybind = c=d\n",
+    );
+}
+
+test "file_edit: remove without a match is identical" {
+    try expectApply(
+        "keybind = a=b\r\n# x\r\n",
+        .{ .remove = .{ .key = "keybind", .value = "z" } },
+        "keybind = a=b\r\n# x\r\n",
+    );
+}
+
+test "file_edit: unset of a last line without newline" {
+    try expectApply("a = 1\nfont-size = 12", .{ .unset = "font-size" }, "a = 1\n");
+}
+
+test "file_edit: set matches a key with a space before equals" {
+    try expectApply("font-size =12\n", set("font-size", "14"), "font-size = 14\n");
 }
