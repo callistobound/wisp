@@ -3,7 +3,7 @@ import Foundation
 /// Watches config files and their parent directories, calling `onChange` on the main
 /// queue after a debounce. Directories are watched because atomic saves swap inodes.
 final class ConfigFileWatcher {
-    private struct Signature: Equatable {
+    struct Signature: Equatable {
         let dev: dev_t
         let ino: ino_t
         let size: off_t
@@ -51,8 +51,19 @@ final class ConfigFileWatcher {
         watches.values.forEach { $0.source.cancel() }
     }
 
+    /// Stat signatures of each path's resolved target; missing files are omitted.
+    static func signatures(paths: [String]) -> [String: Signature] {
+        var result: [String: Signature] = [:]
+        for target in paths.map(resolve) { result[target] = Signature(path: target) }
+        return result
+    }
+
+    private static func resolve(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+    }
+
     func update(paths: [String]) {
-        let targets = paths.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
+        let targets = paths.map(Self.resolve)
         queue.sync {
             // Keep existing signatures so a change pending in the debounce isn't lost.
             signatures = Dictionary(targets.map { ($0, signatures[$0] ?? Signature(path: $0)) }) { a, _ in a }
@@ -106,6 +117,6 @@ final class ConfigFileWatcher {
             signatures.updateValue(new, forKey: path)
         }
         guard changed else { return }
-        DispatchQueue.main.async { [onChange] in onChange() }
+        DispatchQueue.main.async { [weak self] in self?.onChange() }
     }
 }

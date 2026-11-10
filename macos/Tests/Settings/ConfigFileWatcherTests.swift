@@ -78,4 +78,21 @@ struct ConfigFileWatcherTests {
         try atomicReplace(file, with: "a = 2\n")
         #expect(try await wait(until: { counter.count > 0 }, timeout: 0.5) == false)
     }
+
+    @Test func signaturesDetectChangesBetweenSnapshots() throws {
+        let file = try tempFile()
+        let missing = file.deletingLastPathComponent().appendingPathComponent("missing")
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        let paths = [file.path, missing.path]
+        let before = ConfigFileWatcher.signatures(paths: paths)
+        #expect(before == ConfigFileWatcher.signatures(paths: paths))
+
+        try atomicReplace(file, with: "a = 2\n")
+        let replaced = ConfigFileWatcher.signatures(paths: paths)
+        #expect(replaced != before)
+
+        try "b = 1\n".write(to: missing, atomically: false, encoding: .utf8)
+        #expect(ConfigFileWatcher.signatures(paths: paths) != replaced)
+    }
 }
