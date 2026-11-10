@@ -32,6 +32,17 @@ command, with a `ghostty` alias next to it on Linux and macOS (on Windows only
 and shell integration for compatibility. The rest of this document describes
 upstream Ghostty, except for the crash report paths and commands below.
 
+### Upgrading from Ghostty
+
+- On Linux, installing over an existing prefix leaves the old
+  `com.mitchellh.ghostty` desktop, D-Bus, systemd, icon and metainfo files
+  behind. Remove them, and if you had enabled the service, run
+  `systemctl --user enable app-com.jamesboehmer.wisp.service`.
+- Cache and state moved to `~/.cache/wisp` and `~/.local/state/wisp`. Old
+  crash reports and the ssh terminfo cache under `ghostty` are no longer used.
+- Snap users still run `ghostty`, because the snap app name is unchanged.
+- Config still loads from `~/.config/ghostty` until `~/.config/wisp` exists.
+
 Ghostty is a terminal emulator that differentiates itself by being
 fast, feature-rich, and native. While there are many excellent terminal
 emulators available, they all force you to choose between speed,

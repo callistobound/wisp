@@ -1687,7 +1687,7 @@ class: ?[:0]const u8 = null,
 /// is sometimes called a leader key, a key chord, a key table, etc. There
 /// is no hardcoded limit on the number of parts in a sequence.
 ///
-/// Warning: If you define a sequence as a CLI argument to `ghostty`,
+/// Warning: If you define a sequence as a CLI argument to `wisp`,
 /// you probably have to quote the keybind since `>` is a special character
 /// in most shells. Example: wisp --keybind='ctrl+a>n=new_window'
 ///
@@ -2992,7 +2992,8 @@ keybind: Keybinds = .{},
 ///     (Available since: 1.2.0)
 ///
 ///   * `path` - Add Wisp's binary directory to PATH. This ensures the `wisp`
-///     command (and its `ghostty` alias) is available in the shell even if shell init scripts reset PATH.
+///     command (and its `ghostty` alias) is available in the shell even if
+///     shell init scripts reset PATH.
 ///     This is particularly useful on macOS where PATH is often overridden by
 ///     system scripts. The directory is only added if not already present.
 ///
@@ -3650,7 +3651,9 @@ keybind: Keybinds = .{},
 /// The absolute path to the custom icon file.
 /// Supported formats include PNG, JPEG, and ICNS.
 ///
-/// Defaults to `~/.config/wisp/Ghostty.icns`
+/// Defaults to `~/.config/wisp/Ghostty.icns`. If `~/.config/wisp` doesn't
+/// exist and `~/.config/ghostty` does, `~/.config/ghostty/Ghostty.icns` is
+/// used instead.
 @"macos-custom-icon": ?[:0]const u8 = null,
 
 /// The material to use for the frame of the macOS app icon.
