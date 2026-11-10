@@ -36,6 +36,7 @@ class AppDelegate: NSObject,
     @IBOutlet private var menuServices: NSMenu?
     @IBOutlet private var menuCheckForUpdates: NSMenuItem?
     @IBOutlet private var menuOpenConfig: NSMenuItem?
+    @IBOutlet private var menuOpenConfigEditor: NSMenuItem?
     @IBOutlet private var menuReloadConfig: NSMenuItem?
     @IBOutlet private var menuSecureInput: NSMenuItem?
     @IBOutlet private var menuQuit: NSMenuItem?
@@ -1029,6 +1030,10 @@ class AppDelegate: NSObject,
     // MARK: - IB Actions
 
     @IBAction func openConfig(_ sender: Any?) {
+        SettingsController.shared.show()
+    }
+
+    @IBAction func openConfigEditor(_ sender: Any?) {
         ghostty.openConfig()
     }
 
@@ -1239,6 +1244,7 @@ extension AppDelegate {
 
         syncMenuShortcut(config, action: "check_for_updates", menuItem: self.menuCheckForUpdates)
         syncMenuShortcut(config, action: "open_config", menuItem: self.menuOpenConfig)
+        syncMenuShortcut(config, action: "open_config_editor", menuItem: self.menuOpenConfigEditor)
         syncMenuShortcut(config, action: "reload_config", menuItem: self.menuReloadConfig)
         syncMenuShortcut(config, action: "quit", menuItem: self.menuQuit)
 

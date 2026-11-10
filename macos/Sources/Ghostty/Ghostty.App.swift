@@ -121,7 +121,12 @@ extension Ghostty {
             ghostty_app_tick(app)
         }
 
-        private static func openConfig(_ app: ghostty_app_t) {
+        private static func openConfig(_ app: ghostty_app_t, v: ghostty_action_open_config_e) {
+            if v == GHOSTTY_ACTION_OPEN_CONFIG_SETTINGS {
+                SettingsController.shared.show()
+                return
+            }
+
             guard let app_ud = ghostty_app_userdata(app) else { return }
             let app = Unmanaged<App>.fromOpaque(app_ud).takeUnretainedValue()
             app.openConfig()
@@ -652,7 +657,7 @@ extension Ghostty {
                 pwdChanged(app, target: target, v: action.action.pwd)
 
             case GHOSTTY_ACTION_OPEN_CONFIG:
-                openConfig(app)
+                openConfig(app, v: action.action.open_config)
 
             case GHOSTTY_ACTION_FLOAT_WINDOW:
                 toggleFloatWindow(app, target: target, mode: action.action.float_window)

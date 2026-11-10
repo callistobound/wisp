@@ -827,6 +827,8 @@ typedef enum {
   GHOSTTY_ACTION_OPEN_CONFIG_OS_OPEN,
   // Open the config in a new window using $EDITOR or $VISUAL
   GHOSTTY_ACTION_OPEN_CONFIG_NEW_WINDOW,
+  // Open the settings window.
+  GHOSTTY_ACTION_OPEN_CONFIG_SETTINGS,
 } ghostty_action_open_config_e;
 
 // terminal.MouseShape

@@ -42,6 +42,7 @@
                 <outlet property="menuNewWindow" destination="Was-JA-tGl" id="lK7-3I-CPG"/>
                 <outlet property="menuNextSplit" destination="bD7-ei-wKU" id="LeT-xw-eh4"/>
                 <outlet property="menuOpenConfig" destination="BOF-NM-1cW" id="Nze-Go-glw"/>
+                <outlet property="menuOpenConfigEditor" destination="wEd-Cf-0pE" id="oCE-8b-tKd"/>
                 <outlet property="menuPaste" destination="i27-pK-umN" id="ICc-X2-gV3"/>
                 <outlet property="menuPasteSelection" destination="akq-ov-Jjh" id="GS8-aQ-hVw"/>
                 <outlet property="menuPreviousSplit" destination="Lic-px-1wg" id="Rto-CG-yRe"/>
@@ -97,6 +98,12 @@
                             <menuItem title="Preferences…" keyEquivalent="," id="BOF-NM-1cW">
                                 <connections>
                                     <action selector="openConfig:" target="bbz-4X-AYv" id="X65-fg-iWU"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Edit Configuration File…" id="wEd-Cf-0pE">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="openConfigEditor:" target="bbz-4X-AYv" id="Ed7-Ok-ry5"/>
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="GOd-qX-exa"/>

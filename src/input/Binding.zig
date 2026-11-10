@@ -703,14 +703,21 @@ pub const Action = union(enum) {
     /// untested.
     show_on_screen_keyboard,
 
-    /// Open the configuration file in an editor.
+    /// Open the settings window by default; `os_open`/`new_window` open the
+    /// configuration file in an editor.
     ///
+    /// * `settings`: Open the settings window. Falls back to `os_open` on GTK.
+    ///   This is the default action.
     /// * `os_open`: Use the OS's default editor to edit the configuration file.
-    ///   This is the default action. (Available since 1.4.0)
+    ///   (Available since 1.4.0)
     /// * `new_window`: Launch the editor specified in `$EDITOR` or `$VISUAL` in
     ///   a new Ghostty window to edit the configuration file. GTK only. (Available
     ///   since 1.4.0.)
     open_config: OpenConfig,
+
+    /// Open the configuration file in an editor. Accepts `os_open` (default)
+    /// or `new_window`, with the same meaning as for `open_config`.
+    open_config_editor: OpenConfigEditor,
 
     /// Reload the configuration.
     ///
@@ -1223,13 +1230,23 @@ pub const Action = union(enum) {
     };
 
     pub const OpenConfig = enum {
+        /// Open the settings window.
+        settings,
+
         /// Open the config in the OS default editor.
         os_open,
 
         /// Open the config in a new window using $EDITOR or $VISUAL
         new_window,
 
-        pub const default: OpenConfig = .os_open;
+        pub const default: OpenConfig = .settings;
+    };
+
+    pub const OpenConfigEditor = enum {
+        os_open,
+        new_window,
+
+        pub const default: OpenConfigEditor = .os_open;
     };
 
     pub const WindowTheme = enum {
@@ -1386,6 +1403,7 @@ pub const Action = union(enum) {
 
             // Obviously app actions.
             .open_config,
+            .open_config_editor,
             .reload_config,
             .set_window_theme,
             .close_all_windows,
@@ -3102,6 +3120,24 @@ test "parse: equals sign" {
     );
 
     try testing.expectError(Error.InvalidFormat, parseSingle("=ignore"));
+}
+
+test "parse: open_config variants" {
+    const testing = std.testing;
+    const a: Trigger = .{ .key = .{ .unicode = 'a' } };
+
+    try testing.expectEqual(
+        Binding{ .trigger = a, .action = .{ .open_config = .settings } },
+        try parseSingle("a=open_config"),
+    );
+    try testing.expectEqual(
+        Binding{ .trigger = a, .action = .{ .open_config = .os_open } },
+        try parseSingle("a=open_config:os_open"),
+    );
+    try testing.expectEqual(
+        Binding{ .trigger = a, .action = .{ .open_config_editor = .os_open } },
+        try parseSingle("a=open_config_editor"),
+    );
 }
 
 test "parse: text action equals sign" {

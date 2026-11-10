@@ -582,14 +582,20 @@ fn actionCommands(action: Action.Key) []const Command {
             .description = i18n.N_("Show the on-screen keyboard if present."),
         }},
 
-        .open_config => comptime &.{
+        .open_config => comptime &.{.{
+            .action = .{ .open_config = .settings },
+            .title = i18n.N_("Open Settings"),
+            .description = i18n.N_("Open the settings window."),
+        }},
+
+        .open_config_editor => comptime &.{
             .{
-                .action = .{ .open_config = .os_open },
+                .action = .{ .open_config_editor = .os_open },
                 .title = i18n.N_("Open Config Using OS editor"),
                 .description = i18n.N_("Open the config file with the OS's default editor."),
             },
             .{
-                .action = .{ .open_config = .new_window },
+                .action = .{ .open_config_editor = .new_window },
                 .title = i18n.N_("Open Config in New Terminal Window"),
                 .description = i18n.N_("Open the config file in a new window using $EDITOR or $VISUAL."),
             },

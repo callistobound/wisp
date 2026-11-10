@@ -455,6 +455,15 @@ pub fn performAction(
             .app,
             .open_config,
             switch (v) {
+                .settings => .settings,
+                .os_open => .os_open,
+                .new_window => .new_window,
+            },
+        ),
+        .open_config_editor => |v| _ = try rt_app.performAction(
+            .app,
+            .open_config,
+            switch (v) {
                 .os_open => .os_open,
                 .new_window => .new_window,
             },

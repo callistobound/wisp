@@ -1,9 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    // We need access to our app delegate to know if we're quitting or not.
-    @EnvironmentObject private var appDelegate: AppDelegate
-
     var body: some View {
         HStack {
             Image("AppIconImage")
@@ -20,7 +17,7 @@ struct SettingsView: View {
             }
         }
         .padding()
-        .frame(minWidth: 500, maxWidth: 500, minHeight: 156, maxHeight: 156)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
