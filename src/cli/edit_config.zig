@@ -8,10 +8,20 @@ const configpkg = @import("../config.zig");
 const internal_os = @import("../os/main.zig");
 const Config = configpkg.Config;
 const global = @import("../global.zig");
+const file_edit = configpkg.file_edit;
+const Key = @import("../config/key.zig").Key;
 
 pub const Options = struct {
+    set: ?[:0]const u8 = null,
+    unset: ?[:0]const u8 = null,
+    add: ?[:0]const u8 = null,
+    remove: ?[:0]const u8 = null,
+    file: ?[:0]const u8 = null,
+
+    _arena: ?std.heap.ArenaAllocator = null,
+
     pub fn deinit(self: Options) void {
-        _ = self;
+        if (self._arena) |arena| arena.deinit();
     }
 
     /// Enables `-h` and `--help` to work.
@@ -38,6 +48,17 @@ pub const Options = struct {
 /// prioritizing the Application Support directory if neither are
 /// non-empty.
 ///
+/// The flags below edit the config file in place and keep everything else
+/// in it, and they don't open an editor.
+///
+/// Flags:
+///
+///   * `--set=key=value`: Set an option, replacing its last line in the file.
+///   * `--unset=key`: Remove every line for an option.
+///   * `--add=key=value`: Append a line, for repeatable options like `keybind`.
+///   * `--remove=key=value`: Remove the lines matching an option and value.
+///   * `--file=path`: Edit this file instead of the default config file.
+///
 /// This command prefers the `$VISUAL` environment variable over `$EDITOR`,
 /// if both are set. If neither are set, it will print an error
 /// and exit.
@@ -61,13 +82,114 @@ pub fn run(alloc: Allocator) !u8 {
         try args.parse(Options, alloc, &opts, &iter);
     }
 
-    const result = runInner(alloc, stderr);
+    const result = runInner(alloc, opts, stderr);
     // Flushing *shouldn't* fail but...
     stderr.flush() catch {};
     return result;
 }
 
-fn runInner(alloc: Allocator, stderr: *std.Io.Writer) !u8 {
+const ResolveError = Allocator.Error || error{
+    MultipleOps,
+    MissingValue,
+    UnknownKey,
+    InvalidValue,
+};
+
+/// Turn the op flags into an edit. Null if none are set. The result
+/// borrows from `opts`.
+fn resolveOp(alloc: Allocator, opts: Options) ResolveError!?file_edit.Op {
+    const flags = [_]?[:0]const u8{ opts.set, opts.unset, opts.add, opts.remove };
+    var n: usize = 0;
+    for (flags) |f| {
+        if (f != null) n += 1;
+    }
+    if (n == 0) return null;
+    if (n > 1) return error.MultipleOps;
+
+    if (opts.unset) |key| {
+        if (std.meta.stringToEnum(Key, key) == null) return error.UnknownKey;
+        return .{ .unset = key };
+    }
+
+    const raw = opts.set orelse opts.add orelse opts.remove.?;
+    const idx = std.mem.indexOfScalar(u8, raw, '=') orelse return error.MissingValue;
+    const entry: file_edit.Entry = .{ .key = raw[0..idx], .value = raw[idx + 1 ..] };
+    if (std.meta.stringToEnum(Key, entry.key) == null) return error.UnknownKey;
+
+    if (opts.remove == null) {
+        var cfg = try Config.default(alloc);
+        defer cfg.deinit();
+        args.parseIntoField(Config, cfg._arena.?.allocator(), &cfg, entry.key, entry.value) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return error.InvalidValue,
+        };
+    }
+
+    if (opts.set != null) return .{ .set = entry };
+    if (opts.add != null) return .{ .add = entry };
+    return .{ .remove = entry };
+}
+
+fn runOp(
+    alloc: Allocator,
+    opts: Options,
+    op: file_edit.Op,
+    stderr: *std.Io.Writer,
+) !u8 {
+    const path: []const u8 = if (opts.file) |f|
+        try std.fs.path.resolve(alloc, &.{
+            try cwdPath(alloc),
+            f,
+        })
+    else
+        try configpkg.edit.openPath(alloc);
+    defer alloc.free(path);
+
+    file_edit.applyToFile(global.io(), alloc, path, op) catch |err| switch (err) {
+        error.DanglingSymlink => {
+            try stderr.print("error: {s} is a symlink to a missing file\n", .{path});
+            return 1;
+        },
+        error.InvalidValue => {
+            const e = switch (op) {
+                .set, .add, .remove => |e| e,
+                .unset => |k| file_edit.Entry{ .key = k, .value = "" },
+            };
+            try stderr.print("error: invalid value for {s}: {s}\n", .{ e.key, e.value });
+            return 1;
+        },
+        else => return err,
+    };
+    return 0;
+}
+
+fn cwdPath(alloc: Allocator) ![]u8 {
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const n = try std.Io.Dir.cwd().realPathFile(global.io(), ".", &buf);
+    return try alloc.dupe(u8, buf[0..n]);
+}
+
+fn runInner(alloc: Allocator, opts: Options, stderr: *std.Io.Writer) !u8 {
+    const op = resolveOp(alloc, opts) catch |err| {
+        switch (err) {
+            error.OutOfMemory => return err,
+            error.MultipleOps => try stderr.print("error: only one of --set, --unset, --add, --remove may be used\n", .{}),
+            error.MissingValue => try stderr.print("error: expected key=value\n", .{}),
+            error.UnknownKey => {
+                const raw = opts.set orelse opts.unset orelse opts.add orelse opts.remove.?;
+                const key = raw[0 .. std.mem.indexOfScalar(u8, raw, '=') orelse raw.len];
+                try stderr.print("error: unknown config option: {s}\n", .{key});
+            },
+            error.InvalidValue => {
+                const raw = opts.set orelse opts.add orelse opts.remove.?;
+                const idx = std.mem.indexOfScalar(u8, raw, '=').?;
+                try stderr.print("error: invalid value for {s}: {s}\n", .{ raw[0..idx], raw[idx + 1 ..] });
+            },
+        }
+        return 1;
+    };
+    if (op) |o| return runOp(alloc, opts, o, stderr);
+
     // We require libc because we want to use std.c.environ for envp
     // and not have to build that ourselves. We can remove this
     // limitation later but Ghostty already heavily requires libc
@@ -159,4 +281,27 @@ fn runInner(alloc: Allocator, stderr: *std.Io.Writer) !u8 {
         .{ path, path },
     );
     return 1;
+}
+
+test "resolveOp" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    try testing.expect((try resolveOp(alloc, .{})) == null);
+
+    const set = (try resolveOp(alloc, .{ .set = "font-size=14" })).?;
+    try testing.expectEqualStrings("font-size", set.set.key);
+    try testing.expectEqualStrings("14", set.set.value);
+
+    const add = (try resolveOp(alloc, .{ .add = "keybind=ctrl+a=new_tab" })).?;
+    try testing.expectEqualStrings("keybind", add.add.key);
+    try testing.expectEqualStrings("ctrl+a=new_tab", add.add.value);
+
+    const unset = (try resolveOp(alloc, .{ .unset = "font-size" })).?;
+    try testing.expectEqualStrings("font-size", unset.unset);
+
+    try testing.expectError(error.MultipleOps, resolveOp(alloc, .{ .set = "font-size=14", .unset = "font-size" }));
+    try testing.expectError(error.MissingValue, resolveOp(alloc, .{ .set = "font-size" }));
+    try testing.expectError(error.UnknownKey, resolveOp(alloc, .{ .set = "nope=1" }));
+    try testing.expectError(error.InvalidValue, resolveOp(alloc, .{ .set = "font-size=abc" }));
 }
