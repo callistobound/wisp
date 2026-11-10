@@ -164,7 +164,12 @@ fn runOp(
     op: file_edit.Op,
     stderr: *std.Io.Writer,
 ) !u8 {
-    const path: []const u8 = try filePath(alloc, opts) orelse try configpkg.edit.openPath(alloc);
+    // openPath returns [:0]; dupe so every branch frees as a plain slice.
+    const path: []u8 = try filePath(alloc, opts) orelse path: {
+        const p = try configpkg.edit.openPath(alloc);
+        defer alloc.free(p);
+        break :path try alloc.dupe(u8, p);
+    };
     defer alloc.free(path);
 
     file_edit.applyToFile(global.io(), alloc, path, op) catch |err| switch (err) {
