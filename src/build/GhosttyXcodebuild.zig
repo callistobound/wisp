@@ -162,6 +162,16 @@ pub fn init(
         break :open open;
     };
 
+    // Remove the installed app bundle first so the copy replaces it
+    // rather than merging into it.
+    const delete = delete: {
+        const step = RunStep.create(b, "delete app bundle");
+        step.has_side_effects = true;
+        step.addArgs(&.{ "rm", "-rf" });
+        step.addDirectoryArg2(b.graph.path(.install_prefix, "Wisp.app"), .{});
+        break :delete step;
+    };
+
     // Our step to copy the app bundle to the install path.
     // We have to use `cp -R` because there are symlinks in the
     // bundle.
@@ -171,6 +181,7 @@ pub fn init(
         step.addFileArg(b.path(app_path));
         step.addDirectoryArg2(b.graph.path(.install_prefix, ""), .{});
         step.step.dependOn(&build.step);
+        step.step.dependOn(&delete.step);
         break :copy step;
     };
 
