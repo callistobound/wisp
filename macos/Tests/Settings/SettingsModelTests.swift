@@ -147,6 +147,10 @@ struct SettingsModelTests {
         #expect(SettingsRowView.resetFile(for: option("a", source: .theme(path: "/t"))) == nil)
         #expect(SettingsRowView.resetFile(for: option("a", source: .cli)) == nil)
         #expect(SettingsRowView.resetFile(for: option("a", source: .other)) == nil)
+        let keybind = SettingsOption(
+            key: "keybind", kind: .keybind, help: "", enumValues: [],
+            values: [], defaults: [], source: .file(path: "/a", line: 1), entrySources: [])
+        #expect(SettingsRowView.resetFile(for: keybind) == nil)
     }
 
     @Test func resetUnsetsTheLine() throws {

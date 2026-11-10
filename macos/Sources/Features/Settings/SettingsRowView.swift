@@ -16,8 +16,9 @@ struct SettingsRowView: View {
     }
 
     /// The file a reset unsets the option in: only options set by a config file.
+    /// Never keybinds, since unsetting would drop every binding in the file.
     static func resetFile(for option: SettingsOption) -> String? {
-        if case .file(let path, _) = option.source { return path }
+        if option.kind != .keybind, case .file(let path, _) = option.source { return path }
         return nil
     }
 
