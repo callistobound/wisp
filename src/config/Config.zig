@@ -4278,6 +4278,12 @@ fn writeConfigTemplate(path: []const u8) !void {
 /// The legacy `config` file (without extension) is first loaded,
 /// then `config.ghostty`.
 pub fn loadDefaultFiles(self: *Config, alloc: Allocator) !void {
+    {
+        var environ_map = try global.environMap();
+        defer environ_map.deinit();
+        try self.checkConfigDirShadow(global.io(), alloc, &environ_map);
+    }
+
     // Load XDG first
     const legacy_xdg_path = try file_load.legacyDefaultXdgPath(alloc);
     defer alloc.free(legacy_xdg_path);
@@ -4347,6 +4353,82 @@ pub fn loadDefaultFiles(self: *Config, alloc: Allocator) !void {
             };
         }
     }
+}
+
+/// Warn, in the log and as a diagnostic, if `$XDG_CONFIG_HOME/wisp`
+/// is in use and `$XDG_CONFIG_HOME/ghostty` is being ignored.
+fn checkConfigDirShadow(
+    self: *Config,
+    io: std.Io,
+    alloc: Allocator,
+    environ_map: *const std.process.Environ.Map,
+) !void {
+    const shadow = try file_load.configDirShadow(io, alloc, environ_map) orelse return;
+    defer shadow.deinit(alloc);
+
+    const fmt = "using {s}; ignoring {s}. Move your config into {s} or remove it to use {s}.";
+    const args = .{ shadow.wisp, shadow.ghostty, shadow.wisp, shadow.ghostty };
+    log.warn(fmt, args);
+
+    const arena_alloc = self._arena.?.allocator();
+    const diag: cli.Diagnostic = .{
+        .message = try arena_alloc.printSentinel(fmt, args, 0),
+    };
+    try self._diagnostics.append(arena_alloc, diag);
+    try self._replay_steps.append(arena_alloc, .{ .diagnostic = diag });
+}
+
+fn testConfigDirShadow(dirs: []const []const u8) !bool {
+    const testing = std.testing;
+    const io = testing.io;
+    const alloc = testing.allocator;
+
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    for (dirs) |d| {
+        try tmp.dir.createDir(io, d, .default_dir);
+        var sub = try tmp.dir.openDir(io, d, .{});
+        defer sub.close(io);
+        try sub.writeFile(io, .{ .sub_path = "config.ghostty", .data = "font-size = 12\n" });
+    }
+    const tmp_path = try tmp.dir.realPathFileAlloc(io, ".", alloc);
+    defer alloc.free(tmp_path);
+
+    var environ_map = try testing.environ.createMap(alloc);
+    defer environ_map.deinit();
+    try environ_map.put("XDG_CONFIG_HOME", tmp_path);
+
+    var cfg = try Config.default(alloc);
+    defer cfg.deinit();
+    try cfg.checkConfigDirShadow(io, alloc, &environ_map);
+
+    const wisp = try std.fs.path.join(alloc, &.{ tmp_path, "wisp" });
+    defer alloc.free(wisp);
+    const ghostty = try std.fs.path.join(alloc, &.{ tmp_path, "ghostty" });
+    defer alloc.free(ghostty);
+    const expected = try std.fmt.allocPrint(
+        alloc,
+        "using {s}; ignoring {s}. Move your config into {s} or remove it to use {s}.",
+        .{ wisp, ghostty, wisp, ghostty },
+    );
+    defer alloc.free(expected);
+
+    for (cfg._diagnostics.items()) |diag| {
+        if (std.mem.eql(u8, diag.message, expected)) return true;
+    }
+    return false;
+}
+
+test "config dir shadow: wisp and ghostty warns" {
+    try std.testing.expect(try testConfigDirShadow(&.{ "wisp", "ghostty" }));
+}
+
+test "config dir shadow: only ghostty does not warn" {
+    try std.testing.expect(!try testConfigDirShadow(&.{"ghostty"}));
+}
+
+test "config dir shadow: only wisp does not warn" {
+    try std.testing.expect(!try testConfigDirShadow(&.{"wisp"}));
 }
 
 /// Load and parse the CLI args.

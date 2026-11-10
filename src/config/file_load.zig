@@ -30,6 +30,39 @@ fn configDirNameIn(
     return "wisp";
 }
 
+/// The wisp and ghostty config dirs, set only when wisp is in use and
+/// a ghostty dir also exists, so the ghostty one is ignored.
+pub const Shadow = struct {
+    wisp: []const u8,
+    ghostty: []const u8,
+
+    pub fn deinit(self: Shadow, alloc: Allocator) void {
+        alloc.free(self.wisp);
+        alloc.free(self.ghostty);
+    }
+};
+
+/// Returns the paths if the wisp config dir shadows a ghostty one.
+/// The caller must deinit the result.
+pub fn configDirShadow(
+    io: std.Io,
+    alloc: Allocator,
+    environ_map: *const std.process.Environ.Map,
+) !?Shadow {
+    if (!std.mem.eql(u8, try configDirNameIn(io, alloc, environ_map), "wisp")) return null;
+    const ghostty = try internal_os.xdg.config(io, alloc, environ_map, .{ .subdir = "ghostty" });
+    errdefer alloc.free(ghostty);
+    const stat = std.Io.Dir.cwd().statFile(io, ghostty, .{}) catch null;
+    if (stat == null or stat.?.kind != .directory) {
+        alloc.free(ghostty);
+        return null;
+    }
+    return .{
+        .wisp = try internal_os.xdg.config(io, alloc, environ_map, .{ .subdir = "wisp" }),
+        .ghostty = ghostty,
+    };
+}
+
 fn xdgConfigFile(
     io: std.Io,
     alloc: Allocator,
@@ -246,4 +279,23 @@ test "file_load configDirName both" {
 
 test "file_load configDirName neither" {
     try testConfigDirName(&.{}, "wisp");
+}
+
+test "file_load configDirName ghostty symlink to a directory" {
+    const testing = std.testing;
+    const io = testing.io;
+    const alloc = testing.allocator;
+
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDir(io, "dotfiles", .default_dir);
+    try tmp.dir.symLink(io, "dotfiles", "ghostty", .{ .is_directory = true });
+    const tmp_path = try tmp.dir.realPathFileAlloc(io, ".", alloc);
+    defer alloc.free(tmp_path);
+
+    var environ_map = try testing.environ.createMap(alloc);
+    defer environ_map.deinit();
+    try environ_map.put("XDG_CONFIG_HOME", tmp_path);
+
+    try testing.expectEqualStrings("ghostty", try configDirNameIn(io, alloc, &environ_map));
 }
