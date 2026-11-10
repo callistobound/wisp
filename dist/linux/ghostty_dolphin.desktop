@@ -5,6 +5,6 @@ MimeType=inode/directory
 Actions=RunGhosttyDir
 
 [Desktop Action RunGhosttyDir]
-Name=Open Ghostty Here
+Name=Open Wisp Here
 Icon=com.jamesboehmer.wisp
 Exec=wisp +new-window --working-directory=%F

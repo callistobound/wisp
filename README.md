@@ -2,7 +2,7 @@
 <h1>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/fe853809-ba8b-400b-83ab-a9a0da25be8a" alt="Logo" width="128">
-  <br>Ghostty
+  <br>Wisp
 </h1>
   <p align="center">
     Fast, native, feature-rich terminal emulator pushing modern features.
@@ -22,6 +22,15 @@
 </p>
 
 ## About
+
+Wisp is a personal downstream fork of
+[Ghostty](https://github.com/ghostty-org/ghostty). It installs the `wisp`
+command, with a `ghostty` alias next to it on Linux and macOS (on Windows only
+`wisp` exists), and reads its config from `~/.config/wisp`, falling back to
+`~/.config/ghostty` if only that exists. Wisp keeps the Ghostty name for
+`xterm-ghostty`, `GHOSTTY_*` environment variables, `share/ghostty` resources
+and shell integration for compatibility. The rest of this document describes
+upstream Ghostty, except for the crash report paths and commands below.
 
 Ghostty is a terminal emulator that differentiates itself by being
 fast, feature-rich, and native. While there are many excellent terminal
@@ -190,19 +199,19 @@ We haven't done any of this yet.
 
 ## Crash Reports
 
-Ghostty has a built-in crash reporter that will generate and save crash
-reports to disk. The crash reports are saved to the `$XDG_STATE_HOME/ghostty/crash`
+Wisp has a built-in crash reporter that will generate and save crash
+reports to disk. The crash reports are saved to the `$XDG_STATE_HOME/wisp/crash`
 directory. If `$XDG_STATE_HOME` is not set, the default is `~/.local/state`.
 **Crash reports are _not_ automatically sent anywhere off your machine.**
 
-Crash reports are only generated the next time Ghostty is started after a
-crash. If Ghostty crashes and you want to generate a crash report, you must
-restart Ghostty at least once. You should see a message in the log that a
+Crash reports are only generated the next time Wisp is started after a
+crash. If Wisp crashes and you want to generate a crash report, you must
+restart Wisp at least once. You should see a message in the log that a
 crash report was generated.
 
 > [!NOTE]
 >
-> Use the `ghostty +crash-report` CLI command to get a list of available crash
+> Use the `wisp +crash-report` CLI command to get a list of available crash
 > reports. A future version of Ghostty will make the contents of the crash
 > reports more easily viewable through the CLI and GUI.
 
@@ -210,7 +219,7 @@ Crash reports end in the `.ghosttycrash` extension. The crash reports are in
 [Sentry envelope format](https://develop.sentry.dev/sdk/envelopes/). You can
 upload these to your own Sentry account to view their contents, but the format
 is also publicly documented so any other available tools can also be used.
-The `ghostty +crash-report` CLI command can be used to list any crash reports.
+The `wisp +crash-report` CLI command can be used to list any crash reports.
 A future version of Ghostty will show you the contents of the crash report
 directly in the terminal.
 
@@ -218,7 +227,7 @@ To send the crash report to the Ghostty project, you can use the following
 CLI command using the [Sentry CLI](https://docs.sentry.io/cli/installation/):
 
 ```shell-session
-SENTRY_DSN=https://e914ee84fd895c4fe324afa3e53dac76@o4507352570920960.ingest.us.sentry.io/4507850923638784 sentry-cli send-envelope --raw <path to ghostty crash>
+SENTRY_DSN=https://e914ee84fd895c4fe324afa3e53dac76@o4507352570920960.ingest.us.sentry.io/4507850923638784 sentry-cli send-envelope --raw <path to wisp crash>
 ```
 
 > [!WARNING]

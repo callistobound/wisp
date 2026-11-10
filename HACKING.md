@@ -31,8 +31,8 @@ here:
 
 | Command                         | Description                                                                                                            |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `zig build run`                 | Runs Ghostty                                                                                                           |
-| `zig build run-valgrind`        | Runs Ghostty under Valgrind to [check for memory leaks](#checking-for-memory-leaks)                                    |
+| `zig build run`                 | Runs Wisp                                                                                                              |
+| `zig build run-valgrind`        | Runs Wisp under Valgrind to [check for memory leaks](#checking-for-memory-leaks)                                       |
 | `zig build test`                | Runs unit tests (accepts `-Dtest-filter=<filter>` to only run tests whose name matches the filter)                     |
 | `zig build update-translations` | Updates Ghostty's translation strings (see the [Contributor's Guide on Localizing Ghostty](po/README_CONTRIBUTORS.md)) |
 | `zig build dist`                | Builds a source tarball                                                                                                |
@@ -95,24 +95,25 @@ produced.
 
 ## Logging
 
-Ghostty can write logs to a number of destinations. On all platforms, logging to
-`stderr` is available. Depending on the platform and how Ghostty was launched,
+Wisp can write logs to a number of destinations. On all platforms, logging to
+`stderr` is available. Depending on the platform and how Wisp was launched,
 logs sent to `stderr` may be stored by the system and made available for later
 retrieval.
 
-On Linux if Ghostty is launched by the default `systemd` user service, you can use
-`journald` to see Ghostty's logs: `journalctl --user --unit app-com.mitchellh.ghostty.service`.
+On Linux if Wisp is launched by the default `systemd` user service, you can use
+`journald` to see Wisp's logs: `journalctl --user --unit app-com.jamesboehmer.wisp.service`.
 
 On macOS logging to the macOS unified log is available and enabled by default.
-Use the system `log` CLI to view Ghostty's logs: `sudo log stream --level debug --predicate 'subsystem=="com.mitchellh.ghostty"'`.
+Use the system `log` CLI to view Wisp's logs: `sudo log stream --level debug --predicate 'subsystem=="com.jamesboehmer.wisp"'`.
 
-Ghostty's logging can be configured in two ways. The first is by what
-optimization level Ghostty is compiled with. If Ghostty is compiled with `Debug`
-optimizations debug logs will be output to `stderr`. If Ghostty is compiled with
+Wisp's logging can be configured in two ways. The first is by what
+optimization level Wisp is compiled with. If Wisp is compiled with `Debug`
+optimizations debug logs will be output to `stderr`. If Wisp is compiled with
 any other optimization the debug logs will not be output to `stderr`.
 
-Ghostty also checks the `GHOSTTY_LOG` environment variable. It can be used
-to control which destinations receive logs. Ghostty currently defines two
+Wisp also checks the `GHOSTTY_LOG` environment variable (Wisp keeps the
+`GHOSTTY_` prefix for compatibility). It can be used to control which
+destinations receive logs. Wisp currently defines two
 destinations:
 
 - `stderr` - logging to `stderr`.

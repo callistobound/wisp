@@ -16,7 +16,7 @@ pub const Options = struct {
     }
 };
 
-/// The `help` command shows general help about Ghostty. Recognized as either
+/// The `help` command shows general help about Wisp. Recognized as either
 /// `-h`, `--help`, or like other actions `+help`.
 ///
 /// You can also specify `--help` or `-h` along with any action such as
@@ -37,9 +37,12 @@ pub fn run(alloc: Allocator) !u8 {
     try stdout.writeAll(
         \\Usage: wisp [+action] [options]
         \\
-        \\Run the Ghostty terminal emulator or a specific helper action.
+        \\Run the Wisp terminal emulator or a specific helper action.
         \\
-        \\If no `+action` is specified, run the Ghostty terminal emulator.
+        \\On Linux and macOS, `ghostty` is an alias for `wisp`. On Windows
+        \\only `wisp` exists.
+        \\
+        \\If no `+action` is specified, run the Wisp terminal emulator.
         \\All configuration keys are available as command line options.
         \\To specify a configuration key, use the `--<key>=<value>` syntax
         \\where key and value are the same format you'd put into a configuration
@@ -54,8 +57,8 @@ pub fn run(alloc: Allocator) !u8 {
         \\`wisp -e top` will run the `top` command inside the terminal.
         \\
         \\On macOS, launching the terminal emulator from the CLI is not
-        \\supported and only actions are supported. Use `open -na Ghostty.app`
-        \\instead, or `open -na ghostty.app --args --foo=bar --baz=quz` to pass
+        \\supported and only actions are supported. Use `open -na Wisp.app`
+        \\instead, or `open -na Wisp.app --args --foo=bar --baz=quz` to pass
         \\arguments.
         \\
         \\Available actions:

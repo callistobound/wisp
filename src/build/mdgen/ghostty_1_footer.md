@@ -1,15 +1,16 @@
 # FILES
 
-_\$XDG_CONFIG_HOME/ghostty/config.ghostty_
+_\$XDG_CONFIG_HOME/wisp/config.ghostty_
 
-: Location of the default configuration file.
+: Location of the default configuration file. If _\$XDG_CONFIG_HOME/wisp_
+doesn't exist and _\$XDG_CONFIG_HOME/ghostty_ does, the latter is used.
 
-_\$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty_
+_\$HOME/Library/Application Support/com.jamesboehmer.wisp/config.ghostty_
 
 : **On macOS**, location of the default configuration file. This location takes
 precedence over the XDG environment locations.
 
-_\$LOCALAPPDATA/ghostty/config.ghostty_
+_\$LOCALAPPDATA/wisp/config.ghostty_
 
 : **On Windows**, if _\$XDG_CONFIG_HOME_ is not set, _\$LOCALAPPDATA_ will be searched
 for configuration files.
@@ -19,16 +20,18 @@ for configuration files.
 **TERM**
 
 : Defaults to `xterm-ghostty`. Can be configured with the `term` configuration option.
+Wisp keeps the Ghostty name for compatibility.
 
 **GHOSTTY_RESOURCES_DIR**
 
-: Where the Ghostty resources can be found.
+: Where the Wisp resources can be found. Wisp keeps the `GHOSTTY_` prefix
+for compatibility.
 
 **XDG_CONFIG_HOME**
 
 : Default location for configuration files.
 
-**$HOME/Library/Application Support/com.mitchellh.ghostty**
+**$HOME/Library/Application Support/com.jamesboehmer.wisp**
 
 : **MACOS ONLY** default location for configuration files. This location takes
 precedence over the XDG environment locations.
@@ -40,7 +43,7 @@ precedence over the XDG environment locations.
 **GHOSTTY_LOG**
 
 : The `GHOSTTY_LOG` environment variable can be used to control which
-destinations receive logs. Ghostty currently defines two destinations:
+destinations receive logs. Wisp currently defines two destinations:
 
 : - `stderr` - logging to `stderr`.
 : - `macos` - logging to macOS's unified log (has no effect on non-macOS platforms).
@@ -61,4 +64,4 @@ Ghostty contributors <https://github.com/ghostty-org/ghostty/graphs/contributors
 
 # SEE ALSO
 
-**ghostty(5)**
+**wisp(5)**

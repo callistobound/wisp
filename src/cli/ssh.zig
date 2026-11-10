@@ -16,8 +16,8 @@ const usage =
     \\Usage: wisp +ssh [flags] [--] <ssh args...>
     \\
     \\Flags:
-    \\  --forward-env[=bool]  Send Ghostty env vars to the remote. Default: true.
-    \\  --terminfo[=bool]     Install Ghostty terminfo on first connect. Default: true.
+    \\  --forward-env[=bool]  Send Wisp env vars to the remote. Default: true.
+    \\  --terminfo[=bool]     Install Wisp terminfo on first connect. Default: true.
     \\  --cache[=bool]        Use the terminfo install cache. Default: true.
     \\  --ssh=<path>          Path to the ssh binary. Default: first `ssh` on PATH.
     \\  --verbose             Print +ssh status lines to stderr.
@@ -35,7 +35,7 @@ pub const Options = struct {
     /// the remote host. Maps to the `ssh-env` shell integration feature.
     @"forward-env": bool = true,
 
-    /// Install Ghostty's terminfo on the remote host and use
+    /// Install Wisp's terminfo on the remote host and use
     /// `xterm-ghostty` as `TERM` when it's available. Maps to the
     /// `ssh-terminfo` shell integration feature.
     terminfo: bool = true,
@@ -102,7 +102,7 @@ pub const Options = struct {
     }
 };
 
-/// Wrap `ssh` to automatically configure Ghostty terminal integration on
+/// Wrap `ssh` to automatically configure Wisp terminal integration on
 /// remote hosts.
 ///
 /// Any arguments that aren't recognized as `+ssh` flags are passed to
@@ -111,33 +111,36 @@ pub const Options = struct {
 /// has no long flags, and `+ssh` defines no short flags, so there's
 /// nothing to collide.
 ///
-/// This is typically called via Ghostty's shell integration. When
+/// This is typically called via Wisp's shell integration. When
 /// `shell-integration-features` includes `ssh-env` or `ssh-terminfo`,
 /// each shell defines an `ssh` function that runs:
 ///
 ///     ghostty +ssh <flags> -- "$@"
 ///
-/// You can also run `ghostty +ssh` directly, or alias it yourself (e.g.
-/// `alias ssh='ghostty +ssh --'`) if you prefer not to use the shell
-/// integration.
+/// You can also run `wisp +ssh` directly, or alias it yourself (e.g.
+/// `alias ssh='wisp +ssh --'`) if you prefer not to use the shell
+/// integration. The shell integration calls the `ghostty` alias for
+/// compatibility.
 ///
 /// Before it starts `ssh`, `+ssh` can do two pieces of setup. Both are
 /// on by default, and each has its own flag:
 ///
-///   1. **Forward Ghostty's environment** (`--forward-env`). Asks `ssh` to
+///   1. **Forward Wisp's environment** (`--forward-env`). Asks `ssh` to
 ///      send `COLORTERM`, `TERM_PROGRAM`, and `TERM_PROGRAM_VERSION` to the
 ///      remote host using `SendEnv`. Programs on the remote host can use
-///      these to tell that they're running inside Ghostty. The remote
-///      server only accepts them if its `sshd_config` allows them:
+///      these to tell that they're running inside Wisp. (Wisp keeps the
+///      Ghostty values for compatibility.) The remote server only accepts
+///      them if its `sshd_config` allows them:
 ///
 ///          AcceptEnv COLORTERM TERM_PROGRAM TERM_PROGRAM_VERSION
 ///
-///   2. **Install Ghostty's terminfo** (`--terminfo`). The first time you
-///      connect to a host, `+ssh` copies Ghostty's terminfo entry to it and
+///   2. **Install Wisp's terminfo** (`--terminfo`). The first time you
+///      connect to a host, `+ssh` copies Wisp's terminfo entry to it and
 ///      compiles it with `tic`. This teaches programs on the remote host
-///      how to use the `xterm-ghostty` terminal type. Successful installs
-///      are cached (see `ghostty +ssh-cache`), so later connections to the
-///      same host skip this step.
+///      how to use the `xterm-ghostty` terminal type (Wisp keeps that name
+///      for compatibility). Successful installs are cached (see
+///      `wisp +ssh-cache`), so later connections to the same host skip
+///      this step.
 ///
 /// SSH authentication messages remain visible during setup, including
 /// keyboard-interactive prompts and instructions. Remote installer stderr
@@ -170,7 +173,7 @@ pub const Options = struct {
 ///   * `--forward-env=<bool>`: Send `COLORTERM`, `TERM_PROGRAM`, and
 ///     `TERM_PROGRAM_VERSION` to the remote host. Default: `true`.
 ///
-///   * `--terminfo=<bool>`: Install Ghostty's terminfo on the first
+///   * `--terminfo=<bool>`: Install Wisp's terminfo on the first
 ///     connection to each host, and use `xterm-ghostty` as `TERM` when it's
 ///     available. Default: `true`.
 ///
@@ -178,7 +181,7 @@ pub const Options = struct {
 ///     When `false`, both the cache read (skip-if-installed) and the
 ///     cache write (record-on-success) are bypassed, and every
 ///     connection performs the install. To one-shot reinstall a single
-///     host while keeping the cache in use, prefer `ghostty +ssh-cache
+///     host while keeping the cache in use, prefer `wisp +ssh-cache
 ///     --remove=<host>` followed by a normal connection.
 ///
 ///   * `--ssh=<path>`: Path to the `ssh` binary to execute. Default: the
@@ -190,14 +193,14 @@ pub const Options = struct {
 /// Examples:
 ///
 ///     # Basic invocation using defaults:
-///     ghostty +ssh user@example.com
+///     wisp +ssh user@example.com
 ///
-///     # Forward Ghostty env vars but skip the terminfo install.
+///     # Forward Wisp env vars but skip the terminfo install.
 ///     # The remote session uses TERM=xterm-256color:
-///     ghostty +ssh --terminfo=false user@example.com
+///     wisp +ssh --terminfo=false user@example.com
 ///
 ///     # Install terminfo but don't send any extra env vars:
-///     ghostty +ssh --forward-env=false user@example.com
+///     wisp +ssh --forward-env=false user@example.com
 ///
 ///     # SetEnv lines in your ssh config still apply. With this entry in
 ///     # ~/.ssh/config:
@@ -206,16 +209,16 @@ pub const Options = struct {
 ///     #       SetEnv EDITOR=vim
 ///     #
 ///     # ssh still sends EDITOR=vim, along with the TERM chosen by +ssh:
-///     ghostty +ssh dev
+///     wisp +ssh dev
 ///
 ///     # `ssh` flags (short-form `-p`, etc.) pass through unchanged:
-///     ghostty +ssh -p 2222 -i ~/.ssh/id_ed25519 user@example.com
+///     wisp +ssh -p 2222 -i ~/.ssh/id_ed25519 user@example.com
 ///
 ///     # Use `--` explicitly if your ssh args might collide with our flags:
-///     ghostty +ssh -- --some-rare-ssh-arg user@example.com
+///     wisp +ssh -- --some-rare-ssh-arg user@example.com
 ///
 /// Pass `--verbose` to see what `+ssh` is doing. For cache inspection
-/// and management, see `ghostty +ssh-cache`.
+/// and management, see `wisp +ssh-cache`.
 ///
 /// Available since: 1.4.0
 pub fn run(alloc_gpa: Allocator) !u8 {
@@ -529,7 +532,7 @@ fn parseDestination(alloc: Allocator, stdout: []const u8) ?[]const u8 {
     return alloc.print("{s}@{s}:{s}", .{ user, host, port }) catch null;
 }
 
-/// Install Ghostty's terminfo on the remote host over a short-lived SSH
+/// Install Wisp's terminfo on the remote host over a short-lived SSH
 /// ControlMaster connection. The master tears down with the client
 /// (`ControlPersist=no`) so no socket lingers.
 fn installRemoteTerminfo(

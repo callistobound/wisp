@@ -6,13 +6,15 @@
 
 # DESCRIPTION
 
-To configure Ghostty, you must use a configuration file. GUI-based configuration
+To configure Wisp, you must use a configuration file. GUI-based configuration
 is on the roadmap but not yet supported. The configuration file must be placed
-at `$XDG_CONFIG_HOME/ghostty/config.ghostty`, which defaults to `~/.config/ghostty/config.ghostty`
+at `$XDG_CONFIG_HOME/wisp/config.ghostty`, which defaults to `~/.config/wisp/config.ghostty`
 if the [XDG environment is not set](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+If `~/.config/wisp` doesn't exist and `~/.config/ghostty` does, Wisp uses
+`~/.config/ghostty` instead.
 
 **If you are using macOS, the configuration file can also be placed at
-`$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty`.** This is the
+`$HOME/Library/Application Support/com.jamesboehmer.wisp/config.ghostty`.** This is the
 default configuration location for macOS. It will be searched before any of the
 XDG environment locations listed above.
 
@@ -56,7 +58,7 @@ The file format is documented below as an example:
     palette = 15=#fbf1c7
 
 You can view all available configuration options and their documentation by
-executing the command `ghostty +show-config --default --docs`. Note that this will
+executing the command `wisp +show-config --default --docs`. Note that this will
 output the full default configuration with docs to stdout, so you may want to
 pipe that through a pager, an editor, etc.
 
@@ -72,45 +74,46 @@ the public config files of many Ghostty users for examples and inspiration.
 
 ## Configuration Errors
 
-If your configuration file has any errors, Ghostty does its best to ignore
+If your configuration file has any errors, Wisp does its best to ignore
 them and move on. Configuration errors will be logged.
 
 ## Debugging Configuration
 
 You can verify that configuration is being properly loaded by looking at the
-debug output of Ghostty.
+debug output of Wisp.
 
 In the debug output, you should see in the first 20 lines or so messages about
 loading (or not loading) a configuration file, as well as any errors it may have
 encountered. Configuration errors are also shown in a dedicated window on both
-macOS and Linux (GTK). Ghostty does not treat configuration errors as fatal and
+macOS and Linux (GTK). Wisp does not treat configuration errors as fatal and
 will fall back to default values for erroneous keys.
 
-You can also view the full configuration Ghostty is loading using `ghostty
+You can also view the full configuration Wisp is loading using `wisp
 +show-config` from the command-line. Use the `--help` flag to additional options
 for that command.
 
 ## Logging
 
-Ghostty can write logs to a number of destinations. On all platforms, logging to
-`stderr` is available. Depending on the platform and how Ghostty was launched,
+Wisp can write logs to a number of destinations. On all platforms, logging to
+`stderr` is available. Depending on the platform and how Wisp was launched,
 logs sent to `stderr` may be stored by the system and made available for later
 retrieval.
 
-On Linux if Ghostty is launched by the default `systemd` user service, you can use
-`journald` to see Ghostty's logs: `journalctl --user --unit app-com.mitchellh.ghostty.service`.
+On Linux if Wisp is launched by the default `systemd` user service, you can use
+`journald` to see Wisp's logs: `journalctl --user --unit app-com.jamesboehmer.wisp.service`.
 
 On macOS logging to the macOS unified log is available and enabled by default.
---Use the system `log` CLI to view Ghostty's logs: `sudo log stream --level debug
---predicate 'subsystem=="com.mitchellh.ghostty"'`.
+--Use the system `log` CLI to view Wisp's logs: `sudo log stream --level debug
+--predicate 'subsystem=="com.jamesboehmer.wisp"'`.
 
-Ghostty's logging can be configured in two ways. The first is by what
-optimization level Ghostty is compiled with. If Ghostty is compiled with `Debug`
-optimizations debug logs will be output to `stderr`. If Ghostty is compiled with
+Wisp's logging can be configured in two ways. The first is by what
+optimization level Wisp is compiled with. If Wisp is compiled with `Debug`
+optimizations debug logs will be output to `stderr`. If Wisp is compiled with
 any other optimization the debug logs will not be output to `stderr`.
 
-Ghostty also checks the `GHOSTTY_LOG` environment variable. It can be used
-to control which destinations receive logs. Ghostty currently defines two
+Wisp also checks the `GHOSTTY_LOG` environment variable (Wisp keeps the
+`GHOSTTY_` prefix for compatibility). It can be used to control which
+destinations receive logs. Wisp currently defines two
 destinations:
 
 - `stderr` - logging to `stderr`.
