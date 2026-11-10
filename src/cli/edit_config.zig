@@ -172,6 +172,14 @@ fn runOp(
             try stderr.print("error: {s} is a symlink to a missing file\n", .{path});
             return 1;
         },
+        error.HardLink => {
+            try stderr.print("error: {s} has multiple hard links; edit it directly\n", .{path});
+            return 1;
+        },
+        error.AccessDenied, error.ReadOnlyFileSystem => {
+            try stderr.print("error: cannot write {s}\n", .{path});
+            return 1;
+        },
         error.InvalidValue => {
             const e = switch (op) {
                 .set, .add, .remove => |e| e,

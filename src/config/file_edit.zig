@@ -36,6 +36,7 @@ pub fn apply(alloc: Allocator, src: []const u8, op: Op) Error![]u8 {
 
 /// Apply `op` to the file at absolute `path`, creating it if missing. The
 /// write is atomic and goes to the symlink target, not over the link.
+/// Refuses dangling symlinks and files with more than one hard link.
 pub fn applyToFile(io: std.Io, alloc: Allocator, path: []const u8, op: Op) !void {
     const real: ?[:0]u8 = std.Io.Dir.realPathFileAbsoluteAlloc(io, path, alloc) catch |err| switch (err) {
         error.FileNotFound => null,
@@ -54,12 +55,17 @@ pub fn applyToFile(io: std.Io, alloc: Allocator, path: []const u8, op: Op) !void
         var link_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         if (dir.readLink(io, base, &link_buf)) |_| {
             return error.DanglingSymlink;
-        } else |_| {}
+        } else |err| switch (err) {
+            error.NotLink, error.FileNotFound => {},
+            else => |e| return e,
+        }
     }
 
     var perms: std.Io.File.Permissions = .default_file;
     const src: []u8 = if (real != null) src: {
         const st = try dir.statFile(io, base, .{});
+        // Renaming over a hard link would split it.
+        if (st.nlink > 1) return error.HardLink;
         perms = st.permissions;
         break :src try dir.readFileAlloc(io, base, alloc, .unlimited);
     } else try alloc.alloc(u8, 0);
@@ -78,6 +84,9 @@ pub fn applyToFile(io: std.Io, alloc: Allocator, path: []const u8, op: Op) !void
     var w = atomic.file.writer(io, &buf);
     try w.interface.writeAll(out);
     try w.flush();
+    // The create mode is masked by umask, so restore the original exactly.
+    if (real != null) try atomic.file.setPermissions(io, perms);
+    try atomic.file.sync(io);
     try atomic.replace(io);
 }
 
@@ -412,6 +421,39 @@ test "file_edit: applyToFile keeps permissions" {
 
     const stat = try td.dir.statFile(testing.io, "a.ghostty", .{});
     try testing.expectEqual(@as(u32, 0o600), stat.permissions.toMode() & 0o777);
+}
+
+test "file_edit: applyToFile keeps permissions under umask" {
+    if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try testWrite(&td, "a.ghostty", "a = 1\n", .fromMode(0o664));
+    var file = try td.dir.openFile(testing.io, "a.ghostty", .{});
+    defer file.close(testing.io);
+    try file.setPermissions(testing.io, .fromMode(0o664));
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "a.ghostty"), set("font-size", "14"));
+
+    const stat = try td.dir.statFile(testing.io, "a.ghostty", .{});
+    try testing.expectEqual(@as(u32, 0o664), stat.permissions.toMode() & 0o777);
+}
+
+test "file_edit: applyToFile refuses a hard link" {
+    if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
+    var td = try internal_os.TempDir.init();
+    defer td.deinit();
+    try testWrite(&td, "a.ghostty", "a = 1\n", .default_file);
+    try td.dir.hardLink("a.ghostty", td.dir, "b.ghostty", testing.io, .{});
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try testing.expectError(
+        error.HardLink,
+        applyToFile(testing.io, testing.allocator, try testPath(&td, &buf, "a.ghostty"), set("font-size", "14")),
+    );
+    const got = try td.dir.readFileAlloc(testing.io, "b.ghostty", testing.allocator, .unlimited);
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings("a = 1\n", got);
 }
 
 test "file_edit: applyToFile refuses a dangling symlink" {
