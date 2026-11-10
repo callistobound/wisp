@@ -79,6 +79,23 @@ struct ConfigFileWatcherTests {
         #expect(try await wait(until: { counter.count > 0 }, timeout: 0.5) == false)
     }
 
+    @Test func rebaselineIgnoresOurOwnWrite() async throws {
+        let file = try tempFile()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        let counter = Counter()
+        let watcher = ConfigFileWatcher(paths: [file.path], debounce: 0.05) { counter.count += 1 }
+        try "a = 2\n".write(to: file, atomically: false, encoding: .utf8)
+        watcher.rebaseline()
+        try atomicReplace(file, with: "a = 3\n")
+        watcher.rebaseline()
+        #expect(try await wait(until: { counter.count > 0 }, timeout: 0.5) == false)
+
+        // Later changes still trigger.
+        try atomicReplace(file, with: "a = 4\n")
+        #expect(try await wait { counter.count == 1 })
+    }
+
     @Test func signaturesDetectChangesBetweenSnapshots() throws {
         let file = try tempFile()
         let missing = file.deletingLastPathComponent().appendingPathComponent("missing")

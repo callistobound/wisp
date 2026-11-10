@@ -11,6 +11,11 @@ struct SourcePicker: View {
         return ""
     }
 
+    /// Follows a new source only while the selection is still "default".
+    static func resynced(_ selection: String, to source: SettingsSource) -> String {
+        selection.isEmpty ? initial(for: source) : selection
+    }
+
     private var choices: [String] {
         var out = [""] + files
         if !out.contains(selection) { out.append(selection) }

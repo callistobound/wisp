@@ -19,13 +19,18 @@ class SettingsController: NSWindowController, NSWindowDelegate {
         window.contentMinSize = NSSize(width: 720, height: 480)
         window.isReleasedWhenClosed = false
 
-        // Saving reloads the config, which posts a new one for the model.
+        // Saving reloads the config, which posts a new one for the model. The watcher
+        // takes our own write as seen so it doesn't reload a second time.
+        weak var controller: SettingsController?
         let ghostty = (NSApp.delegate as? AppDelegate)?.ghostty
         let model = ghostty.map { ghostty in
             SettingsModel(
                 config: ghostty.config,
                 defaultTarget: ghostty.configPath ?? Ghostty.AllocatedString(ghostty_config_open_path()).string,
-                onSaved: { ghostty.reloadConfig() })
+                onSaved: {
+                    controller?.watcher?.rebaseline()
+                    ghostty.reloadConfig()
+                })
         }
 
         // Don't let the SwiftUI content constrain the window size.
@@ -41,6 +46,7 @@ class SettingsController: NSWindowController, NSWindowDelegate {
 
         self.model = model
         super.init(window: window)
+        controller = self
         window.delegate = self
 
         NotificationCenter.default.addObserver(
@@ -57,6 +63,7 @@ class SettingsController: NSWindowController, NSWindowDelegate {
     // MARK: - Functions
 
     func show() {
+        NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
         startWatching()
     }

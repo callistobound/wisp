@@ -138,4 +138,47 @@ struct SettingsModelTests {
         #expect(try String(contentsOfFile: path, encoding: .utf8) == "font-size = 15\n")
         #expect(saved == 0)
     }
+
+    // MARK: - Reset
+
+    @Test func resetFileOnlyForFileSources() {
+        #expect(SettingsRowView.resetFile(for: option("a", source: .file(path: "/a", line: 1))) == "/a")
+        #expect(SettingsRowView.resetFile(for: option("a")) == nil)
+        #expect(SettingsRowView.resetFile(for: option("a", source: .theme(path: "/t"))) == nil)
+        #expect(SettingsRowView.resetFile(for: option("a", source: .cli)) == nil)
+        #expect(SettingsRowView.resetFile(for: option("a", source: .other)) == nil)
+    }
+
+    @Test func resetUnsetsTheLine() throws {
+        let config = try TemporaryConfig("window-inherit-font-size = false\n")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let opt = try #require(m.options.first { $0.key == "window-inherit-font-size" })
+        let file = try #require(SettingsRowView.resetFile(for: opt))
+        #expect(m.apply(GHOSTTY_CONFIG_EDIT_UNSET, key: opt.key, value: nil, target: file) == .ok)
+        #expect(try String(contentsOfFile: path, encoding: .utf8) == "")
+        try config.reload(nil)
+        m.reload(config: config)
+        #expect(m.options.first { $0.key == "window-inherit-font-size" }?.source == .default)
+    }
+
+    // MARK: - Entry sources
+
+    @Test func entryNotInFileOrDefaultsIsOther() {
+        let opt = SettingsOption(
+            key: "config-file", kind: .repeatable, help: "", enumValues: [],
+            values: ["/abs/a", "/abs/b", "/abs/c"], defaults: ["/abs/b"], source: .default,
+            entrySources: [.default, .default, .file(path: "/f", line: 2)])
+        #expect(opt.entrySource(0) == .other)
+        #expect(opt.entrySource(1) == .default)
+        #expect(opt.entrySource(2) == .file(path: "/f", line: 2))
+    }
+
+    // MARK: - Source picker
+
+    @Test func pickerResyncsOnlyFromDefault() {
+        #expect(SourcePicker.resynced("", to: .file(path: "/a", line: 1)) == "/a")
+        #expect(SourcePicker.resynced("/b", to: .file(path: "/a", line: 1)) == "/b")
+        #expect(SourcePicker.resynced("", to: .default) == "")
+    }
 }

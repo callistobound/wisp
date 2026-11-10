@@ -52,6 +52,14 @@ struct SettingsOption: Identifiable {
     let source: SettingsSource
     let entrySources: [SettingsSource]
     var id: String { key }
+
+    /// The source of entry `i`. One found in no file that isn't a default was
+    /// written in a form the formatter doesn't reproduce, so it's `.other`.
+    func entrySource(_ i: Int) -> SettingsSource {
+        let source = i < entrySources.count ? entrySources[i] : .default
+        guard source == .default, values.indices.contains(i), !defaults.contains(values[i]) else { return source }
+        return .other
+    }
 }
 
 /// Owns a `ghostty_config_schema_t` and exposes it as Swift values.

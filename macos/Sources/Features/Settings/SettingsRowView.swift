@@ -15,6 +15,12 @@ struct SettingsRowView: View {
         _selection = State(initialValue: SourcePicker.initial(for: option.source))
     }
 
+    /// The file a reset unsets the option in: only options set by a config file.
+    static func resetFile(for option: SettingsOption) -> String? {
+        if case .file(let path, _) = option.source { return path }
+        return nil
+    }
+
     private var target: String {
         model.writeTarget(for: option, choice: selection.isEmpty ? model.defaultTarget : selection)
     }
@@ -27,6 +33,11 @@ struct SettingsRowView: View {
                     Text(option.key).font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
                 Spacer()
+                if let file = Self.resetFile(for: option) {
+                    Button("Reset") { _ = save(GHOSTTY_CONFIG_EDIT_UNSET, nil, file) }
+                        .controlSize(.small)
+                        .help("Remove from \(file)")
+                }
                 if option.kind != .keybind {
                     SourcePicker(files: model.files, selection: $selection)
                 }
@@ -47,6 +58,7 @@ struct SettingsRowView: View {
             HelpText(help: option.help)
         }
         .padding(.vertical, 4)
+        .onChange(of: option.source) { selection = SourcePicker.resynced(selection, to: $0) }
     }
 
     private func save(_ op: ghostty_config_edit_op_e, _ value: String?, _ file: String?) -> Bool {
@@ -186,15 +198,19 @@ private struct SettingsControl: View {
     private var repeatable: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(option.values.enumerated()), id: \.offset) { i, value in
+                // `.other` entries can't be matched to a line, so they can't be removed either.
+                let source = option.entrySource(i)
+                let file = entryFile(source)
                 HStack {
                     Text(value).font(.body.monospaced()).textSelection(.enabled)
                     Spacer()
-                    let file = entryFile(i)
                     Button("−") { _ = save(GHOSTTY_CONFIG_EDIT_REMOVE, value, file) }
                         .disabled(file == nil)
-                        .help(file.map { "Remove from \($0)" } ?? "Set by default; can't be removed")
+                        .help(file.map { "Remove from \($0)" } ?? (source == .other
+                            ? "Set in a config file in a different form"
+                            : "Set by default; can't be removed"))
                 }
-                .foregroundStyle(entryFile(i) == nil ? .secondary : .primary)
+                .foregroundStyle(file == nil && source != .other ? .secondary : .primary)
             }
             HStack {
                 TextField("Add entry", text: $newEntry)
@@ -206,9 +222,9 @@ private struct SettingsControl: View {
         }
     }
 
-    private func entryFile(_ i: Int) -> String? {
-        guard i < option.entrySources.count, case .file(let path, _) = option.entrySources[i] else { return nil }
-        return path
+    private func entryFile(_ source: SettingsSource) -> String? {
+        if case .file(let path, _) = source { return path }
+        return nil
     }
 
     private func add() {

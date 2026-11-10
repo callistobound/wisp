@@ -12,6 +12,8 @@ struct KeybindSettingsView: View {
         let value: String
         let trigger: String
         let source: SettingsSource
+        /// Followed by `chain=` entries, which attach to whatever binding precedes them.
+        var chained = false
         var id: String { value }
         var isDefault: Bool { source == .default }
     }
@@ -27,8 +29,9 @@ struct KeybindSettingsView: View {
         var chips: [String: [Chip]] = [:]
         for (i, value) in option.values.enumerated() {
             guard let (trigger, action) = Shortcut.split(binding: value), trigger != "chain" else { continue }
-            let source = i < option.entrySources.count ? option.entrySources[i] : .default
-            chips[action, default: []].append(Chip(value: value, trigger: trigger, source: source))
+            let chained = option.values.indices.contains(i + 1) && option.values[i + 1].hasPrefix("chain=")
+            chips[action, default: []].append(
+                Chip(value: value, trigger: trigger, source: option.entrySource(i), chained: chained))
         }
         for value in option.defaults {
             guard let (trigger, action) = Shortcut.split(binding: value), trigger != "chain" else { continue }
@@ -37,13 +40,13 @@ struct KeybindSettingsView: View {
         return chips.sorted { $0.key < $1.key }.map { Row(action: $0.key, chips: $0.value) }
     }
 
-    /// File-set chips are removed from their file; defaults are unbound in `target`.
-    /// Theme and CLI chips can't be removed.
+    /// File-set chips are removed from their file. Defaults, chained heads and lines
+    /// written in another form are unbound in `target`. Theme and CLI chips can't be removed.
     static func removal(of chip: Chip, target: String) -> (op: ghostty_config_edit_op_e, value: String, file: String)? {
         switch chip.source {
-        case .file(let path, _): (GHOSTTY_CONFIG_EDIT_REMOVE, chip.value, path)
-        case .default: (GHOSTTY_CONFIG_EDIT_ADD, "\(chip.trigger)=unbind", target)
-        default: nil
+        case .file(let path, _) where !chip.chained: (GHOSTTY_CONFIG_EDIT_REMOVE, chip.value, path)
+        case .file, .default, .other: (GHOSTTY_CONFIG_EDIT_ADD, "\(chip.trigger)=unbind", target)
+        case .theme, .cli: nil
         }
     }
 
@@ -86,8 +89,12 @@ private struct KeybindRowView: View {
         self.row = row
         _recordingAction = recording
         self.usedBy = usedBy
-        let file = row.chips.last { if case .file = $0.source { true } else { false } }
-        _selection = State(initialValue: file.map { SourcePicker.initial(for: $0.source) } ?? "")
+        _selection = State(initialValue: SourcePicker.initial(for: Self.fileSource(row)))
+    }
+
+    /// The source of the row's last file-set chip, or default.
+    private static func fileSource(_ row: KeybindSettingsView.Row) -> SettingsSource {
+        row.chips.last { if case .file = $0.source { true } else { false } }?.source ?? .default
     }
 
     private var target: String { selection.isEmpty ? model.defaultTarget : selection }
@@ -123,6 +130,7 @@ private struct KeybindRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .onChange(of: Self.fileSource(row)) { selection = SourcePicker.resynced(selection, to: $0) }
     }
 
     @ViewBuilder
@@ -181,7 +189,7 @@ private struct ChipView: View {
         case .default: "\(chip.value) (default)"
         case .theme(let path): "\(chip.value). Set by theme \((path as NSString).lastPathComponent)"
         case .cli: "\(chip.value). Set on the command line"
-        case .other: "\(chip.value). Set elsewhere"
+        case .other: "\(chip.value). Set in a config file in a different form"
         }
     }
 

@@ -38,6 +38,8 @@ final class ConfigFileWatcher {
     private var signatures: [String: Signature?] = [:]
     private var watches: [String: Watch] = [:]
     private var dirty = false
+    /// Set by `rebaseline`; until the next fire, only signature changes count.
+    private var quiet = false
     private var pending: DispatchWorkItem?
 
     init(paths: [String], debounce: TimeInterval = 0.2, onChange: @escaping () -> Void) {
@@ -72,6 +74,17 @@ final class ConfigFileWatcher {
         }
     }
 
+    /// Takes the files as they are now as unchanged, so the events from a write we
+    /// already reloaded for don't fire. A later change still differs in signature.
+    func rebaseline() {
+        queue.sync {
+            for path in signatures.keys { signatures[path] = Signature(path: path) }
+            dirty = false
+            quiet = true
+            rearm()
+        }
+    }
+
     /// Watches every target and parent directory, reopening any whose inode was replaced.
     private func rearm() {
         let targets = Set(signatures.keys)
@@ -100,7 +113,7 @@ final class ConfigFileWatcher {
 
     private func handleEvent(file: Bool) {
         // Writes to a watched file always count; directory events count only if a target changed.
-        if file { dirty = true }
+        if file && !quiet { dirty = true }
         rearm()
         pending?.cancel()
         let item = DispatchWorkItem { [weak self] in self?.fire() }
@@ -111,6 +124,7 @@ final class ConfigFileWatcher {
     private func fire() {
         var changed = dirty
         dirty = false
+        quiet = false
         for (path, old) in signatures {
             let new = Signature(path: path)
             if new != old { changed = true }

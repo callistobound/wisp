@@ -154,4 +154,37 @@ struct ShortcutTests {
         #expect(self.chip(m, action: row.action, trigger: chip.trigger) == nil)
         #expect(!rows.contains { $0.action == "unbind" })
     }
+
+    @Test @MainActor func removingAChainedChipKeepsTheChain() throws {
+        let text = "keybind = super+a=new_tab\nkeybind = chain=new_window\nkeybind = super+b=close_surface\n"
+        let config = try TemporaryConfig(text)
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let head = try #require(chip(m, action: "new_tab", trigger: "super+a"))
+        #expect(head.chained)
+        #expect(chip(m, action: "close_surface", trigger: "super+b")?.chained == false)
+
+        let edit = try #require(KeybindSettingsView.removal(of: head, target: path))
+        #expect(edit.op == GHOSTTY_CONFIG_EDIT_ADD && edit.value == "super+a=unbind" && edit.file == path)
+        #expect(m.apply(edit.op, key: "keybind", value: edit.value, target: edit.file) == .ok)
+        try config.reload(nil)
+        m.reload(config: config)
+
+        let lines = try String(contentsOfFile: path, encoding: .utf8).split(separator: "\n").map(String.init)
+        let headLine = try #require(lines.firstIndex(of: "keybind = super+a=new_tab"))
+        #expect(lines[headLine + 1] == "keybind = chain=new_window")
+        #expect(chip(m, action: "new_tab", trigger: "super+a") == nil)
+        let other = try #require(chip(m, action: "close_surface", trigger: "super+b"))
+        #expect(other.source == .file(path: path, line: 3) && !other.chained)
+    }
+
+    @Test @MainActor func nonCanonicalNonDefaultBindingIsOtherAndUnbinds() throws {
+        let config = try TemporaryConfig("keybind = cmd+ctrl+y=new_tab\n")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let found = try #require(chip(m, action: "new_tab", trigger: "super+ctrl+y"))
+        #expect(found.source == .other && !found.isDefault)
+        let edit = try #require(KeybindSettingsView.removal(of: found, target: path))
+        #expect(edit.op == GHOSTTY_CONFIG_EDIT_ADD && edit.value == "super+ctrl+y=unbind" && edit.file == path)
+    }
 }
