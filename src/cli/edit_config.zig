@@ -136,13 +136,12 @@ fn runOp(
     op: file_edit.Op,
     stderr: *std.Io.Writer,
 ) !u8 {
-    const path: []const u8 = if (opts.file) |f|
-        try std.fs.path.resolve(alloc, &.{
-            try cwdPath(alloc),
-            f,
-        })
-    else
-        try configpkg.edit.openPath(alloc);
+    const path: []const u8 = if (opts.file) |f| path: {
+        if (std.fs.path.isAbsolute(f)) break :path try alloc.dupe(u8, f);
+        const cwd = try cwdPath(alloc);
+        defer alloc.free(cwd);
+        break :path try std.fs.path.resolve(alloc, &.{ cwd, f });
+    } else try configpkg.edit.openPath(alloc);
     defer alloc.free(path);
 
     file_edit.applyToFile(global.io(), alloc, path, op) catch |err| switch (err) {
@@ -177,7 +176,7 @@ fn runInner(alloc: Allocator, opts: Options, stderr: *std.Io.Writer) !u8 {
             error.MissingValue => try stderr.print("error: expected key=value\n", .{}),
             error.UnknownKey => {
                 const raw = opts.set orelse opts.unset orelse opts.add orelse opts.remove.?;
-                const key = raw[0 .. std.mem.indexOfScalar(u8, raw, '=') orelse raw.len];
+                const key = if (opts.unset != null) raw else raw[0 .. std.mem.indexOfScalar(u8, raw, '=') orelse raw.len];
                 try stderr.print("error: unknown config option: {s}\n", .{key});
             },
             error.InvalidValue => {
