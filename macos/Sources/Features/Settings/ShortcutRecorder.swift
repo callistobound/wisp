@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 /// Pure helpers for converting key events to and from Ghostty trigger strings.
@@ -129,22 +130,25 @@ enum Shortcut {
 struct ShortcutRecorder: NSViewRepresentable {
     let onModifiers: (NSEvent.ModifierFlags) -> Void
     let onCapture: (String) -> Void
+    /// Escape with no modifiers.
+    let onCancel: () -> Void
 
     func makeNSView(context: Context) -> RecorderView {
         let view = RecorderView()
-        view.onModifiers = onModifiers
-        view.onCapture = onCapture
+        updateNSView(view, context: context)
         return view
     }
 
     func updateNSView(_ view: RecorderView, context: Context) {
         view.onModifiers = onModifiers
         view.onCapture = onCapture
+        view.onCancel = onCancel
     }
 
     final class RecorderView: NSView {
         var onModifiers: ((NSEvent.ModifierFlags) -> Void)?
         var onCapture: ((String) -> Void)?
+        var onCancel: (() -> Void)?
 
         override var acceptsFirstResponder: Bool { true }
 
@@ -177,6 +181,10 @@ struct ShortcutRecorder: NSViewRepresentable {
 
         private func capture(_ event: NSEvent) {
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if event.keyCode == UInt16(kVK_Escape), mods.isDisjoint(with: [.control, .option, .shift, .command]) {
+                onCancel?()
+                return
+            }
             guard let trigger = Shortcut.trigger(
                 keyCode: event.keyCode,
                 characters: event.characters(byApplyingModifiers: []),

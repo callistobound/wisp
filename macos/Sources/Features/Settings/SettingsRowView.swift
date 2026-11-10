@@ -94,7 +94,8 @@ private struct SettingsControl: View {
 
     @State private var text = ""
     @State private var newEntry = ""
-    @State private var colorTask: Task<Void, Never>?
+    @State private var color = Color.clear
+    @State private var colorWrite = Debounce()
 
     private var isUnset: Bool { option.source == .default }
     private var current: String { option.values.first ?? option.defaults.first ?? "" }
@@ -112,7 +113,7 @@ private struct SettingsControl: View {
             case .enum:
                 Picker("", selection: Binding(
                     get: { current },
-                    set: { _ = save(GHOSTTY_CONFIG_EDIT_SET, $0, nil) })) {
+                    set: { if $0 != current { _ = save(GHOSTTY_CONFIG_EDIT_SET, $0, nil) } })) {
                     if !option.enumValues.contains(current) { Text(current).tag(current) }
                     ForEach(option.enumValues, id: \.self) { Text($0).tag($0) }
                 }
@@ -138,13 +139,7 @@ private struct SettingsControl: View {
                 TextField(option.defaults.first ?? "", text: $text)
                     .textFieldStyle(.roundedBorder)
                     .font(.body.monospaced())
-                    .onSubmit {
-                        if text.isEmpty {
-                            _ = save(GHOSTTY_CONFIG_EDIT_UNSET, nil, nil)
-                        } else {
-                            _ = save(GHOSTTY_CONFIG_EDIT_SET, text, nil)
-                        }
-                    }
+                    .onSubmit(submit)
             }
         }
         .labelsHidden()
@@ -155,26 +150,35 @@ private struct SettingsControl: View {
     /// Unset options show their default as the placeholder.
     private func resetText() {
         text = isUnset ? "" : current
+        color = Color(nsColor: NSColor(hex: current) ?? .clear)
     }
 
+    private func submit() {
+        if text.isEmpty {
+            if !isUnset { _ = save(GHOSTTY_CONFIG_EDIT_UNSET, nil, nil) }
+        } else if isUnset || text != current {
+            _ = save(GHOSTTY_CONFIG_EDIT_SET, text, nil)
+        }
+    }
+
+    /// The picker edits a local draft; only the write is debounced.
     private var colorBinding: Binding<Color> {
         Binding(
-            get: { Color(nsColor: NSColor(hex: current) ?? .clear) },
-            set: { color in
-                guard let hex = Self.hex(NSColor(color)) else { return }
-                // ColorPicker updates continuously while dragging.
-                colorTask?.cancel()
-                colorTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    guard !Task.isCancelled else { return }
-                    _ = save(GHOSTTY_CONFIG_EDIT_SET, hex, nil)
+            get: { color },
+            set: { newColor in
+                color = newColor
+                guard let hex = Self.hex(NSColor(newColor)) else { return }
+                colorWrite.run {
+                    if hex.caseInsensitiveCompare(current) != .orderedSame {
+                        _ = save(GHOSTTY_CONFIG_EDIT_SET, hex, nil)
+                    }
                 }
             })
     }
 
     private static func hex(_ color: NSColor) -> String? {
         guard let c = color.usingColorSpace(.sRGB) else { return nil }
-        let rgb = [c.redComponent, c.greenComponent, c.blueComponent].map { Int(($0 * 255).rounded()) }
+        let rgb = [c.redComponent, c.greenComponent, c.blueComponent].map { Int((min(max($0, 0), 1) * 255).rounded()) }
         return String(format: "#%02X%02X%02X", rgb[0], rgb[1], rgb[2])
     }
 
@@ -210,5 +214,19 @@ private struct SettingsControl: View {
     private func add() {
         guard !newEntry.isEmpty else { return }
         if save(GHOSTTY_CONFIG_EDIT_ADD, newEntry, nil) { newEntry = "" }
+    }
+}
+
+/// Runs only the last of a burst of calls. A class so rescheduling doesn't redraw.
+private final class Debounce {
+    private var task: Task<Void, Never>?
+
+    @MainActor func run(after nanoseconds: UInt64 = 300_000_000, _ body: @escaping @MainActor () -> Void) {
+        task?.cancel()
+        task = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+            body()
+        }
     }
 }

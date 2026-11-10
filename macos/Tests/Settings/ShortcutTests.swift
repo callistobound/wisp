@@ -88,7 +88,7 @@ struct ShortcutTests {
         let chip = try #require(row.chips.first { $0.trigger == "ctrl+a" })
         #expect(chip.source == .file(path: path, line: 1))
 
-        let edit = KeybindSettingsView.removal(of: chip, target: "/unused")
+        let edit = try #require(KeybindSettingsView.removal(of: chip, target: "/unused"))
         #expect(edit.op == GHOSTTY_CONFIG_EDIT_REMOVE && edit.file == path)
         #expect(m.apply(edit.op, key: "keybind", value: edit.value, target: edit.file) == .ok)
         #expect(try String(contentsOfFile: path, encoding: .utf8) == "keybind = ctrl+b=new_tab\n")
@@ -101,8 +101,57 @@ struct ShortcutTests {
         let rows = KeybindSettingsView.rows(option)
         let chip = try #require(rows.flatMap(\.chips).first)
         #expect(chip.isDefault)
-        let edit = KeybindSettingsView.removal(of: chip, target: "/t")
+        let edit = try #require(KeybindSettingsView.removal(of: chip, target: "/t"))
         #expect(edit.op == GHOSTTY_CONFIG_EDIT_ADD && edit.file == "/t")
         #expect(edit.value == "\(chip.trigger)=unbind")
+    }
+
+    @Test func themeChipCannotBeRemoved() {
+        let chip = KeybindSettingsView.Chip(value: "a=new_tab", trigger: "a", source: .theme(path: "/themes/x"))
+        #expect(KeybindSettingsView.removal(of: chip, target: "/t") == nil)
+    }
+
+    // MARK: - Round trips through a config file
+
+    @MainActor
+    private func chip(_ m: SettingsModel, action: String, trigger: String) -> KeybindSettingsView.Chip? {
+        guard let option = m.options.first(where: { $0.key == "keybind" }) else { return nil }
+        return KeybindSettingsView.rows(option).first { $0.action == action }?.chips.first { $0.trigger == trigger }
+    }
+
+    @Test @MainActor func recordedTriggersKeepTheirFileSource() throws {
+        let config = try TemporaryConfig("")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let ctrlSuper = try #require(Shortcut.trigger(
+            keyCode: UInt16(kVK_ANSI_T), characters: "t", modifiers: [.control, .command]))
+        let arrow = try #require(Shortcut.trigger(keyCode: UInt16(kVK_UpArrow), characters: nil, modifiers: [.control]))
+        #expect(m.apply(GHOSTTY_CONFIG_EDIT_ADD, key: "keybind", value: "\(ctrlSuper)=new_tab", target: path) == .ok)
+        #expect(m.apply(GHOSTTY_CONFIG_EDIT_ADD, key: "keybind", value: "\(arrow)=new_tab", target: path) == .ok)
+        try config.reload(nil)
+        m.reload(config: config)
+
+        let first = try #require(chip(m, action: "new_tab", trigger: "super+ctrl+t"))
+        #expect(first.source == .file(path: path, line: 1) && !first.isDefault)
+        let second = try #require(chip(m, action: "new_tab", trigger: "ctrl+arrow_up"))
+        #expect(second.source == .file(path: path, line: 2) && !second.isDefault)
+    }
+
+    @Test @MainActor func unbindingADefaultRemovesIt() throws {
+        let config = try TemporaryConfig("")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let option = try #require(m.options.first { $0.key == "keybind" })
+        let row = try #require(KeybindSettingsView.rows(option).first { !$0.chips.isEmpty })
+        let chip = try #require(row.chips.first)
+        let edit = try #require(KeybindSettingsView.removal(of: chip, target: path))
+        #expect(m.apply(edit.op, key: "keybind", value: edit.value, target: edit.file) == .ok)
+        try config.reload(nil)
+        m.reload(config: config)
+
+        let reloaded = try #require(m.options.first { $0.key == "keybind" })
+        let rows = KeybindSettingsView.rows(reloaded)
+        #expect(self.chip(m, action: row.action, trigger: chip.trigger) == nil)
+        #expect(!rows.contains { $0.action == "unbind" })
     }
 }

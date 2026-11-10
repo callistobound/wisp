@@ -76,6 +76,21 @@ struct SettingsModelTests {
         #expect(m.overrideWarning(option: option("font-size"), target: "/c/new") == nil)
     }
 
+    @Test func overrideWarningNormalizesPaths() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("config").path
+        let link = dir.appendingPathComponent("link").path
+        try "".write(toFile: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: file)
+
+        let m = try model(files: [file])
+        let opt = option("font-size", source: .file(path: file, line: 1))
+        #expect(m.overrideWarning(option: opt, target: dir.appendingPathComponent("sub/../config").path) == nil)
+        #expect(m.overrideWarning(option: opt, target: link) == nil)
+    }
+
     // MARK: - Filtering
 
     @Test func searchMatchesKeyAndIgnoresSection() throws {

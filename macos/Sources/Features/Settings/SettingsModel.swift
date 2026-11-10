@@ -33,6 +33,7 @@ final class SettingsModel: ObservableObject {
     let defaultTarget: String
     private let onSaved: () -> Void
     private var schema: SettingsSchema?
+    private var normalizedPaths: [String: String] = [:]
 
     init(config: Ghostty.Config, defaultTarget: String, onSaved: @escaping () -> Void = {}) {
         self.defaultTarget = defaultTarget
@@ -45,7 +46,8 @@ final class SettingsModel: ObservableObject {
         self.schema = schema
         options = schema.options
         files = schema.files
-        if let file = selectedFile, !files.contains(file) { selectedFile = nil }
+        normalizedPaths = [:]
+        if let file = selectedFile, !files.contains(where: { samePath($0, file) }) { selectedFile = nil }
     }
 
     // MARK: - Labels and sections
@@ -96,7 +98,9 @@ final class SettingsModel: ObservableObject {
                     || option.help.localizedCaseInsensitiveContains(query) else { return false }
             }
             if let file = selectedFile {
-                guard ([option.source] + option.entrySources).contains(where: { $0.filePath == file }) else { return false }
+                guard ([option.source] + option.entrySources).contains(where: {
+                    $0.filePath.map { samePath($0, file) } ?? false
+                }) else { return false }
             }
             if query.isEmpty, let section = selectedSection {
                 return Self.section(for: option.key) == section
@@ -116,12 +120,25 @@ final class SettingsModel: ObservableObject {
 
     /// Warns when the file that set the option loads after `target`, or `target` isn't loaded yet.
     func overrideWarning(option: SettingsOption, target: String) -> String? {
-        guard case .file(let source, _) = option.source, source != target else { return nil }
-        if let targetIndex = files.firstIndex(of: target) {
-            guard let sourceIndex = files.firstIndex(of: source), targetIndex < sourceIndex else { return nil }
+        guard case .file(let source, _) = option.source, !samePath(source, target) else { return nil }
+        if let targetIndex = files.firstIndex(where: { samePath($0, target) }) {
+            guard let sourceIndex = files.firstIndex(where: { samePath($0, source) }),
+                  targetIndex < sourceIndex else { return nil }
         }
         let basename = (source as NSString).lastPathComponent
         return "⚠ \(basename) sets this later and will override it."
+    }
+
+    /// Compares paths after standardizing them and resolving symlinks. Cached until reload.
+    func samePath(_ a: String, _ b: String) -> Bool {
+        a == b || normalized(a) == normalized(b)
+    }
+
+    private func normalized(_ path: String) -> String {
+        if let cached = normalizedPaths[path] { return cached }
+        let result = URL(fileURLWithPath: (path as NSString).standardizingPath).resolvingSymlinksInPath().path
+        normalizedPaths[path] = result
+        return result
     }
 
     func apply(_ op: ghostty_config_edit_op_e, key: String, value: String?, target: String) -> EditResult {

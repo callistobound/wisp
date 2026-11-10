@@ -4,6 +4,8 @@ import GhosttyKit
 /// The Keybindings section: one row per action, with a chip per trigger.
 struct KeybindSettingsView: View {
     @ObservedObject var model: SettingsModel
+    /// The action being recorded; one recorder at a time.
+    @State private var recording: String?
 
     struct Chip: Identifiable, Equatable {
         /// The whole entry, "trigger=action".
@@ -36,16 +38,20 @@ struct KeybindSettingsView: View {
     }
 
     /// File-set chips are removed from their file; defaults are unbound in `target`.
-    static func removal(of chip: Chip, target: String) -> (op: ghostty_config_edit_op_e, value: String, file: String) {
-        if case .file(let path, _) = chip.source { return (GHOSTTY_CONFIG_EDIT_REMOVE, chip.value, path) }
-        return (GHOSTTY_CONFIG_EDIT_ADD, "\(chip.trigger)=unbind", target)
+    /// Theme and CLI chips can't be removed.
+    static func removal(of chip: Chip, target: String) -> (op: ghostty_config_edit_op_e, value: String, file: String)? {
+        switch chip.source {
+        case .file(let path, _): (GHOSTTY_CONFIG_EDIT_REMOVE, chip.value, path)
+        case .default: (GHOSTTY_CONFIG_EDIT_ADD, "\(chip.trigger)=unbind", target)
+        default: nil
+        }
     }
 
     var body: some View {
         if let option = model.options.first(where: { $0.key == "keybind" }) {
             let rows = Self.rows(option)
             List(rows) { row in
-                KeybindRowView(model: model, row: row) { trigger in
+                KeybindRowView(model: model, row: row, recording: $recording) { trigger in
                     let shown = Shortcut.display(trigger)
                     return rows.first { other in
                         other.action != row.action && other.chips.contains { Shortcut.display($0.trigger) == shown }
@@ -61,24 +67,31 @@ struct KeybindSettingsView: View {
 private struct KeybindRowView: View {
     @ObservedObject var model: SettingsModel
     let row: KeybindSettingsView.Row
+    @Binding var recordingAction: String?
     /// The other action already using a trigger, if any.
     let usedBy: (String) -> String?
 
     @State private var selection: String
-    @State private var recording = false
     @State private var captured: String?
     @State private var held: NSEvent.ModifierFlags = []
     @State private var error: String?
 
-    init(model: SettingsModel, row: KeybindSettingsView.Row, usedBy: @escaping (String) -> String?) {
+    init(
+        model: SettingsModel,
+        row: KeybindSettingsView.Row,
+        recording: Binding<String?>,
+        usedBy: @escaping (String) -> String?
+    ) {
         self.model = model
         self.row = row
+        _recordingAction = recording
         self.usedBy = usedBy
         let file = row.chips.last { if case .file = $0.source { true } else { false } }
         _selection = State(initialValue: file.map { SourcePicker.initial(for: $0.source) } ?? "")
     }
 
     private var target: String { selection.isEmpty ? model.defaultTarget : selection }
+    private var recording: Bool { recordingAction == row.action }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -90,10 +103,16 @@ private struct KeybindRowView: View {
 
             HStack(spacing: 6) {
                 ForEach(row.chips) { chip in
-                    ChipView(chip: chip) { edit(KeybindSettingsView.removal(of: chip, target: target)) }
+                    ChipView(chip: chip, remove: KeybindSettingsView.removal(of: chip, target: target).map { e in
+                        { _ = edit(e) }
+                    })
                 }
                 if !recording {
-                    Button("Record") { recording = true }
+                    Button("Record") {
+                        captured = nil
+                        held = []
+                        recordingAction = row.action
+                    }
                 }
             }
 
@@ -110,7 +129,7 @@ private struct KeybindRowView: View {
     private var recorder: some View {
         HStack {
             ZStack {
-                ShortcutRecorder(onModifiers: { held = $0 }, onCapture: { captured = $0 })
+                ShortcutRecorder(onModifiers: { held = $0 }, onCapture: { captured = $0 }, onCancel: stopRecording)
                 Text(captured.map(Shortcut.display) ?? (held.isEmpty ? "Type a shortcut…" : Shortcut.symbols(held)))
                     .foregroundStyle(captured == nil ? .secondary : .primary)
                     .allowsHitTesting(false)
@@ -133,7 +152,7 @@ private struct KeybindRowView: View {
     }
 
     private func stopRecording() {
-        recording = false
+        if recording { recordingAction = nil }
         captured = nil
         held = []
     }
@@ -153,24 +172,29 @@ private struct KeybindRowView: View {
 
 private struct ChipView: View {
     let chip: KeybindSettingsView.Chip
-    let remove: () -> Void
+    /// Nil when the chip can't be removed.
+    let remove: (() -> Void)?
 
     private var help: String {
         switch chip.source {
         case .file(let path, let line): "\(chip.value) (\(path):\(line))"
         case .default: "\(chip.value) (default)"
-        default: chip.value
+        case .theme(let path): "\(chip.value). Set by theme \((path as NSString).lastPathComponent)"
+        case .cli: "\(chip.value). Set on the command line"
+        case .other: "\(chip.value). Set elsewhere"
         }
     }
 
     var body: some View {
         HStack(spacing: 4) {
             Text(Shortcut.display(chip.trigger))
-            Button(action: remove) {
-                Image(systemName: "xmark.circle.fill")
+            if let remove {
+                Button(action: remove) {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .help(chip.isDefault ? "Unbind this default" : "Remove")
             }
-            .buttonStyle(.plain)
-            .help(chip.isDefault ? "Unbind this default" : "Remove")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
