@@ -163,12 +163,14 @@ pub fn init(
     };
 
     // Remove the installed app bundle first so the copy replaces it
-    // rather than merging into it.
+    // rather than merging into it. Only after a successful build, so a
+    // failed build keeps the previous app.
     const delete = delete: {
         const step = RunStep.create(b, "delete app bundle");
         step.has_side_effects = true;
         step.addArgs(&.{ "rm", "-rf" });
         step.addDirectoryArg2(b.graph.path(.install_prefix, "Wisp.app"), .{});
+        step.step.dependOn(&build.step);
         break :delete step;
     };
 
