@@ -30,8 +30,8 @@ if [ -n "${WISP_BASH_INJECT:-$GHOSTTY_BASH_INJECT}" ]; then
   # Restore an existing ENV that was replaced by the shell integration code.
   if [[ -n "${WISP_BASH_ENV:-$GHOSTTY_BASH_ENV}" ]]; then
     builtin export ENV="${WISP_BASH_ENV:-$GHOSTTY_BASH_ENV}"
-    builtin unset WISP_BASH_ENV GHOSTTY_BASH_ENV
   fi
+  builtin unset WISP_BASH_ENV GHOSTTY_BASH_ENV
 
   # Restore bash's default 'posix' behavior. Also reset 'inherit_errexit',
   # which doesn't happen as part of the 'posix' reset.
@@ -83,14 +83,14 @@ if [ -n "${WISP_BASH_INJECT:-$GHOSTTY_BASH_INJECT}" ]; then
 fi
 
 # Add Ghostty binary to PATH if the path feature is enabled
-if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"path"* && -n "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}" ]]; then
-  if [[ ":$PATH:" != *":${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}:"* ]]; then
-    export PATH="$PATH:${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}"
+if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"path"* && -n "${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}" ]]; then
+  if [[ ":$PATH:" != *":${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}:"* ]]; then
+    export PATH="$PATH:${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}"
   fi
 fi
 
 # Sudo
-if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"sudo"* && -n "$TERMINFO" ]]; then
+if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"sudo"* && -n "$TERMINFO" ]]; then
   # Wrap `sudo` command to ensure Ghostty terminfo is preserved.
   #
   # This approach supports wrapping a `sudo` alias, but the alias definition
@@ -121,13 +121,13 @@ fi
 #
 # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
 # feature flags into command options.
-if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *ssh-* ]]; then
+if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *ssh-* ]]; then
   function ssh() {
     builtin local -a flags
     flags=()
-    [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-env* ]] && flags+=(--forward-env=false)
-    [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
-    "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}/ghostty" +ssh "${flags[@]}" -- "$@"
+    [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" != *ssh-env* ]] && flags+=(--forward-env=false)
+    [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
+    "${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}/ghostty" +ssh "${flags[@]}" -- "$@"
   }
 fi
 
@@ -161,16 +161,16 @@ function __ghostty_precmd() {
     fi
 
     # Cursor
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"cursor"* ]]; then
       builtin local cursor=5  # blinking bar
-      [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor:steady"* ]] && cursor=6  # steady bar
+      [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"cursor:steady"* ]] && cursor=6  # steady bar
 
       [[ "$PS1" != *"\[\e[${cursor} q\]"* ]] && PS1=$PS1"\[\e[${cursor} q\]"
       [[ "$PS0" != *'\[\e[0 q\]'* ]] && PS0=$PS0'\[\e[0 q\]' # reset
     fi
 
     # Title (working directory)
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
       PS1=$PS1'\[\e]2;\w\a\]'
     fi
   fi
@@ -214,7 +214,7 @@ function __ghostty_preexec() {
   PS2="$_GHOSTTY_SAVE_PS2"
 
   # Title (current command)
-  if [[ -n $cmd && "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
+  if [[ -n $cmd && "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
     builtin printf "\e]2;%s\a" "${cmd//[[:cntrl:]]/}"
   fi
 

@@ -256,7 +256,7 @@ _ghostty_deferred_init() {
         _ghostty_report_pwd"
     _ghostty_report_pwd
 
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
       # Enable terminal title changes, formatted for user-friendly display.
       functions[_ghostty_precmd]+="
           builtin print -rnu $_ghostty_fd \$'\\e]2;'\"\${(%):-%(4~|…/%3~|%~)}\"\$'\\a'"
@@ -264,14 +264,14 @@ _ghostty_deferred_init() {
           builtin print -rnu $_ghostty_fd \$'\\e]2;'\"\${1//[[:cntrl:]]}\"\$'\\a'"
     fi
 
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"cursor"* ]]; then
       # Enable cursor shape changes depending on the current keymap.
       # This implementation leaks blinking block cursor into external commands
       # executed from zle. For example, users of fzf-based widgets may find
       # themselves with a blinking block cursor within fzf.
       _ghostty_zle_line_init _ghostty_zle_line_finish _ghostty_zle_keymap_select() {
         builtin local steady=0
-        [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor:steady"* ]] && steady=1
+        [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"cursor:steady"* ]] && steady=1
         case ${KEYMAP-} in
             vicmd|visual) builtin print -nu "$_ghostty_fd" "\e[$(( 1 + steady )) q" ;; # block
             *)            builtin print -nu "$_ghostty_fd" "\e[$(( 5 + steady )) q" ;; # bar
@@ -296,14 +296,14 @@ _ghostty_deferred_init() {
     "${functions[_ghostty_zle_line_init]}
 
     # Add Ghostty binary to PATH if the path feature is enabled
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"path"* ]] && [[ -n "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}" ]]; then
-      if [[ ":$PATH:" != *":${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}:"* ]]; then
-        builtin export PATH="$PATH:${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}"
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"path"* ]] && [[ -n "${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}" ]]; then
+      if [[ ":$PATH:" != *":${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}:"* ]]; then
+        builtin export PATH="$PATH:${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}"
       fi
     fi
 
     # Sudo
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"sudo"* ]] && [[ -n "$TERMINFO" ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *"sudo"* ]] && [[ -n "$TERMINFO" ]]; then
       # Wrap `sudo` command to ensure Ghostty terminfo is preserved
       function sudo() {
         builtin local sudo_has_sudoedit_flags="no"
@@ -330,12 +330,12 @@ _ghostty_deferred_init() {
     #
     # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
     # feature flags into command options.
-    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *ssh-* ]]; then
+    if [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" == *ssh-* ]]; then
       function ssh() {
         local flags=()
-        [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-env* ]] && flags+=(--forward-env=false)
-        [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
-        "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}/ghostty" +ssh $flags -- "$@"
+        [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" != *ssh-env* ]] && flags+=(--forward-env=false)
+        [[ "${WISP_SHELL_FEATURES-$GHOSTTY_SHELL_FEATURES}" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
+        "${WISP_BIN_DIR-$GHOSTTY_BIN_DIR}/ghostty" +ssh $flags -- "$@"
       }
     fi
 
