@@ -2295,7 +2295,7 @@ const Action = struct {
         defer notification.unref();
         notification.setBody(n.body);
 
-        const icon = gio.ThemedIcon.new("com.jamesboehmer.wisp");
+        const icon = gio.ThemedIcon.new("com.callistobound.wisp");
         defer icon.unref();
         notification.setIcon(icon.as(gio.Icon));
         notification.setDefaultActionAndTargetValue(

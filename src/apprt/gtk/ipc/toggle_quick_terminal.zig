@@ -11,8 +11,8 @@ const DBus = @import("DBus.zig");
 ///
 /// ```sh
 /// gdbus call --session \
-///   --dest com.jamesboehmer.wisp \
-///   --object-path /com/jamesboehmer/wisp \
+///   --dest com.callistobound.wisp \
+///   --object-path /com/callistobound/wisp \
 ///   --method org.gtk.Actions.Activate \
 ///   toggle-quick-terminal [] []
 /// ```

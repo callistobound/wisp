@@ -123,7 +123,7 @@ fn logFn(
 ) void {
     // On Mac, we use unified logging. To view this:
     //
-    //   sudo log stream --level debug --predicate 'subsystem=="com.jamesboehmer.wisp"'
+    //   sudo log stream --level debug --predicate 'subsystem=="com.callistobound.wisp"'
     //
     // macOS logging is thread safe so no need for locks/mutexes
     macos: {

@@ -55,10 +55,10 @@ pub const i18n: bool = config.i18n;
 /// There are many places that don't use this variable so simply swapping
 /// this variable is NOT ENOUGH to change the bundle ID. I just wanted to
 /// avoid it in Zig coe as much as possible.
-pub const bundle_id = "com.jamesboehmer.wisp";
+pub const bundle_id = "com.callistobound.wisp";
 
 /// The gettext domain. Must match the domain in build/GhosttyI18n.zig.
-pub const i18n_domain = "com.jamesboehmer.wisp";
+pub const i18n_domain = "com.callistobound.wisp";
 
 /// True if we should have "slow" runtime safety checks. The initial motivation
 /// for this was terminal page/pagelist integrity checks. These were VERY

@@ -44,7 +44,7 @@ pub const Options = struct {
 /// file, which is typically located at `$XDG_CONFIG_HOME/wisp/config.ghostty`,
 /// or under `$XDG_CONFIG_HOME/ghostty` if only that directory exists.
 /// On macOS, this may also be located at
-/// `~/Library/Application Support/com.jamesboehmer.wisp/config.ghostty`.
+/// `~/Library/Application Support/com.callistobound.wisp/config.ghostty`.
 /// On macOS, whichever path exists and is non-empty will be prioritized,
 /// prioritizing the Application Support directory if neither are
 /// non-empty.

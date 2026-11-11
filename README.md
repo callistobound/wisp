@@ -58,7 +58,7 @@ dist/wisp/disable-upstream-workflows.sh   # after any upstream merge
 - On Linux, installing over an existing prefix leaves the old
   `com.mitchellh.ghostty` desktop, D-Bus, systemd, icon and metainfo files
   behind. Remove them, and if you had enabled the service, run
-  `systemctl --user enable app-com.jamesboehmer.wisp.service`.
+  `systemctl --user enable app-com.callistobound.wisp.service`.
 - Cache and state moved to `~/.cache/wisp` and `~/.local/state/wisp`. Old
   crash reports and the ssh terminfo cache under `ghostty` are no longer used.
 - Snap users still run `ghostty`, because the snap app name is unchanged.

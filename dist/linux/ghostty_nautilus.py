@@ -21,7 +21,7 @@ from pathlib import Path
 import gettext
 from gi.repository import Nautilus, GObject, Gio
 
-DOMAIN = "com.jamesboehmer.wisp"
+DOMAIN = "com.callistobound.wisp"
 locale_dir = Path(__file__).absolute().parents[2] / "locale"
 _ = gettext.translation(DOMAIN, locale_dir, fallback=True).gettext
 
@@ -51,7 +51,7 @@ def get_items_for_files(name, files):
     paths = get_paths_to_open(files)
     if paths:
         item = Nautilus.MenuItem(name=name, label=_('Open in Wisp'),
-            icon='com.jamesboehmer.wisp')
+            icon='com.callistobound.wisp')
         item.connect('activate', open_in_ghostty_activated, paths)
         return [item]
     else:

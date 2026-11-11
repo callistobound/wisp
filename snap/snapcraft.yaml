@@ -22,7 +22,7 @@ apps:
     command: bin/wisp
     command-chain: [app/launcher]
     completer: share/bash-completion/completions/wisp.bash
-    desktop: share/applications/com.jamesboehmer.wisp.desktop
+    desktop: share/applications/com.callistobound.wisp.desktop
     #refresh-mode: ignore-running # Store rejects this, needs fix in review-tools
     environment:
       PATH: /snap/ghostty/current/bin:/snap/ghostty/current/usr/bin:$PATH
@@ -110,7 +110,7 @@ parts:
         -fsys=libpng \
         -fsys=zlib
       cp -rp zig-out/* $CRAFT_PART_INSTALL/
-      sed -i 's|Icon=com.jamesboehmer.wisp|Icon=${SNAP}/share/icons/hicolor/512x512/apps/com.jamesboehmer.wisp.png|g' $CRAFT_PART_INSTALL/share/applications/com.jamesboehmer.wisp.desktop
+      sed -i 's|Icon=com.callistobound.wisp|Icon=${SNAP}/share/icons/hicolor/512x512/apps/com.callistobound.wisp.png|g' $CRAFT_PART_INSTALL/share/applications/com.callistobound.wisp.desktop
 
   libs:
     plugin: nil

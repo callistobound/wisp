@@ -6,5 +6,5 @@ Actions=RunGhosttyDir
 
 [Desktop Action RunGhosttyDir]
 Name=Open Wisp Here
-Icon=com.jamesboehmer.wisp
+Icon=com.callistobound.wisp
 Exec=wisp +new-window --working-directory=%F

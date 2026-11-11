@@ -12,13 +12,13 @@ const DBus = @import("DBus.zig");
 // `ghostty +new-window` is equivalent to the following command (on a release build):
 //
 // ```
-// gdbus call --session --dest com.jamesboehmer.wisp --object-path /com/jamesboehmer/wisp --method org.gtk.Actions.Activate new-window [] []
+// gdbus call --session --dest com.callistobound.wisp --object-path /com/callistobound/wisp --method org.gtk.Actions.Activate new-window [] []
 // ```
 //
 // `ghostty +new-window -e echo hello` would be equivalent to the following command (on a release build):
 //
 // ```
-// gdbus call --session --dest com.jamesboehmer.wisp --object-path /com/jamesboehmer/wisp --method org.gtk.Actions.Activate new-window-command '[<@as ["-e" "echo" "hello"]>]' []
+// gdbus call --session --dest com.callistobound.wisp --object-path /com/callistobound/wisp --method org.gtk.Actions.Activate new-window-command '[<@as ["-e" "echo" "hello"]>]' []
 // ```
 pub fn newWindow(alloc: Allocator, target: apprt.ipc.Target, value: apprt.ipc.Action.NewWindow) (Allocator.Error || std.Io.Writer.Error || apprt.ipc.Errors)!bool {
     var dbus = try DBus.init(

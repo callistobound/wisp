@@ -14,7 +14,7 @@ If `~/.config/wisp` doesn't exist and `~/.config/ghostty` does, Wisp uses
 `~/.config/ghostty` instead.
 
 **If you are using macOS, the configuration file can also be placed at
-`$HOME/Library/Application Support/com.jamesboehmer.wisp/config.ghostty`.** This is the
+`$HOME/Library/Application Support/com.callistobound.wisp/config.ghostty`.** This is the
 default configuration location for macOS. It will be searched before any of the
 XDG environment locations listed above.
 
@@ -100,11 +100,11 @@ logs sent to `stderr` may be stored by the system and made available for later
 retrieval.
 
 On Linux if Wisp is launched by the default `systemd` user service, you can use
-`journald` to see Wisp's logs: `journalctl --user --unit app-com.jamesboehmer.wisp.service`.
+`journald` to see Wisp's logs: `journalctl --user --unit app-com.callistobound.wisp.service`.
 
 On macOS logging to the macOS unified log is available and enabled by default.
 --Use the system `log` CLI to view Wisp's logs: `sudo log stream --level debug
---predicate 'subsystem=="com.jamesboehmer.wisp"'`.
+--predicate 'subsystem=="com.callistobound.wisp"'`.
 
 Wisp's logging can be configured in two ways. The first is by what
 optimization level Wisp is compiled with. If Wisp is compiled with `Debug`
