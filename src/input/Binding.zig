@@ -47,6 +47,14 @@ pub const Flags = packed struct {
     /// if it doesn't exist.
     performable: bool = false,
 
+    /// Writes the prefixes for these flags, e.g. "global:unconsumed:".
+    pub fn format(self: Flags, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        if (self.all) try writer.writeAll("all:");
+        if (self.global) try writer.writeAll("global:");
+        if (!self.consumed) try writer.writeAll("unconsumed:");
+        if (self.performable) try writer.writeAll("performable:");
+    }
+
     /// C type
     pub const C = u8;
 
@@ -2252,21 +2260,24 @@ pub const Set = struct {
                 .leaf => |leaf| {
                     // When we get to the leaf, the buffer_stream contains
                     // the full sequence of keys needed to reach this action.
-                    buffer.print("={f}", .{leaf.action}) catch return error.OutOfMemory;
-                    try formatter.formatEntry([]const u8, buffer.buffer[0..buffer.end]);
+                    var line: [1024]u8 = undefined;
+                    var w: std.Io.Writer = .fixed(&line);
+                    w.print("{f}{s}={f}", .{ leaf.flags, buffer.buffered(), leaf.action }) catch
+                        return error.OutOfMemory;
+                    try formatter.formatEntry([]const u8, w.buffered());
                 },
 
                 .leaf_chained => |leaf| {
-                    const pos = buffer.end;
+                    var line: [1024]u8 = undefined;
                     for (leaf.actions.items, 0..) |action, i| {
+                        var w: std.Io.Writer = .fixed(&line);
                         if (i == 0) {
-                            buffer.print("={f}", .{action}) catch return error.OutOfMemory;
+                            w.print("{f}{s}={f}", .{ leaf.flags, buffer.buffered(), action }) catch
+                                return error.OutOfMemory;
                         } else {
-                            buffer.end = 0;
-                            buffer.print("chain={f}", .{action}) catch return error.OutOfMemory;
+                            w.print("chain={f}", .{action}) catch return error.OutOfMemory;
                         }
-                        try formatter.formatEntry([]const u8, buffer.buffer[0..buffer.end]);
-                        buffer.end = pos;
+                        try formatter.formatEntry([]const u8, w.buffered());
                     }
                 },
             }
@@ -4979,6 +4990,38 @@ test "set: formatEntries leaf_chained with text action" {
     const expected =
         \\keybind = a=text:hello
         \\keybind = chain=text:world
+        \\
+    ;
+    try testing.expectEqualStrings(expected, output.written());
+}
+
+test "set: formatEntries keeps flags" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const formatterpkg = @import("../config/formatter.zig");
+
+    var s: Set = .{};
+    defer s.deinit(alloc);
+    try s.parseAndPut(alloc, "global:unconsumed:ctrl+a=new_window");
+    try s.parseAndPut(alloc, "performable:ctrl+b=new_tab");
+    try s.parseAndPut(alloc, "chain=close_surface");
+    try s.parseAndPut(alloc, "unconsumed:ctrl+c>d=new_split:right");
+
+    var output: std.Io.Writer.Allocating = .init(alloc);
+    defer output.deinit();
+    for ([_]u21{ 'a', 'b', 'c' }) |cp| {
+        const entry = s.get(.{ .key = .{ .unicode = cp }, .mods = .{ .ctrl = true } }).?;
+        var buf: [1024]u8 = undefined;
+        var writer: std.Io.Writer = .fixed(&buf);
+        try entry.key_ptr.format(&writer);
+        try entry.value_ptr.formatEntries(&writer, formatterpkg.entryFormatter("keybind", &output.writer));
+    }
+
+    const expected =
+        \\keybind = global:unconsumed:ctrl+a=new_window
+        \\keybind = performable:ctrl+b=new_tab
+        \\keybind = chain=close_surface
+        \\keybind = unconsumed:ctrl+c>d=new_split:right
         \\
     ;
     try testing.expectEqualStrings(expected, output.written());
