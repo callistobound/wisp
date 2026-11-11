@@ -15,6 +15,7 @@ const expandPath = @import("../os/path.zig").expand;
 
 const gtk = @import("gtk.zig");
 const GitVersion = @import("GitVersion.zig");
+const WispVersion = @import("WispVersion.zig");
 
 /// Standard build configuration options.
 optimize: std.lang.Optimize,
@@ -341,6 +342,13 @@ pub fn init(b: *std.Build, versions: Versions) !Config {
 
             else => return err,
         };
+        // A Wisp release tag wins over any other tag on the same commit.
+        for (vsn.tags) |tag| {
+            const wisp = WispVersion.fromTag(tag, app_version) catch
+                @panic("wisp release tags must be vX.Y.Z-wisp.N with X.Y.Z matching build.zig.zon");
+            if (wisp) |v| break :version v;
+        }
+
         for (vsn.tags) |tag| {
             // libghostty-vt release tags are checked by libVersion.
             if (std.mem.startsWith(u8, tag, lib_tag_prefix)) continue;
