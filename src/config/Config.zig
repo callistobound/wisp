@@ -4370,18 +4370,12 @@ fn checkConfigDirShadow(
     const shadow = try file_load.configDirShadow(io, alloc, environ_map) orelse return;
     defer shadow.deinit(alloc);
 
-    const fmt = "using {s}; ignoring {s}. Move your config into {s} or remove it to use {s}.";
-    const args = .{ shadow.wisp, shadow.ghostty, shadow.wisp, shadow.ghostty };
-    log.warn(fmt, args);
-
-    const arena_alloc = self._arena.?.allocator();
-    const diag: cli.Diagnostic = .{
-        .message = try arena_alloc.printSentinel(fmt, args, 0),
-    };
-    try self._diagnostics.append(arena_alloc, diag);
-    try self._replay_steps.append(arena_alloc, .{ .diagnostic = diag });
+    // Expected when moving to Wisp, so only logged.
+    _ = self;
+    log.info("using {s}; ignoring {s}", .{ shadow.wisp, shadow.ghostty });
 }
 
+/// Whether checking the config dirs reports a diagnostic.
 fn testConfigDirShadow(dirs: []const []const u8) !bool {
     const testing = std.testing;
     const io = testing.io;
@@ -4406,25 +4400,11 @@ fn testConfigDirShadow(dirs: []const []const u8) !bool {
     defer cfg.deinit();
     try cfg.checkConfigDirShadow(io, alloc, &environ_map);
 
-    const wisp = try std.fs.path.join(alloc, &.{ tmp_path, "wisp" });
-    defer alloc.free(wisp);
-    const ghostty = try std.fs.path.join(alloc, &.{ tmp_path, "ghostty" });
-    defer alloc.free(ghostty);
-    const expected = try std.fmt.allocPrint(
-        alloc,
-        "using {s}; ignoring {s}. Move your config into {s} or remove it to use {s}.",
-        .{ wisp, ghostty, wisp, ghostty },
-    );
-    defer alloc.free(expected);
-
-    for (cfg._diagnostics.items()) |diag| {
-        if (std.mem.eql(u8, diag.message, expected)) return true;
-    }
-    return false;
+    return cfg._diagnostics.items().len > 0;
 }
 
-test "config dir shadow: wisp and ghostty warns" {
-    try std.testing.expect(try testConfigDirShadow(&.{ "wisp", "ghostty" }));
+test "config dir shadow: wisp and ghostty is not an error" {
+    try std.testing.expect(!try testConfigDirShadow(&.{ "wisp", "ghostty" }));
 }
 
 test "config dir shadow: only ghostty does not warn" {
