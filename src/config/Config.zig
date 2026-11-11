@@ -1306,9 +1306,10 @@ command: ?Command = null,
 /// will result in `foo=baz` being passed to the launched commands.
 ///
 /// These environment variables will override any existing environment
-/// variables set by Wisp. For example, if you set `GHOSTTY_RESOURCES_DIR`
+/// variables set by Wisp. For example, if you set `WISP_RESOURCES_DIR`
 /// then the value you set here will override the value Wisp typically
-/// automatically injects. Wisp keeps the `GHOSTTY_` prefix for compatibility.
+/// automatically injects. `WISP_RESOURCES_DIR` wins over
+/// `GHOSTTY_RESOURCES_DIR`, so set the `WISP_` name.
 ///
 /// These environment variables _will not_ be passed to commands run by Wisp
 /// for other purposes, like `open` or `xdg-open` used to open URLs in your

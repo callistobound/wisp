@@ -22,10 +22,10 @@ for configuration files.
 : Defaults to `xterm-ghostty`. Can be configured with the `term` configuration option.
 Wisp keeps the Ghostty name for compatibility.
 
-**GHOSTTY_RESOURCES_DIR**
+**WISP_RESOURCES_DIR**
 
-: Where the Wisp resources can be found. Wisp keeps the `GHOSTTY_` prefix
-for compatibility.
+: Where the Wisp resources can be found. `GHOSTTY_RESOURCES_DIR` is still read
+as a fallback.
 
 **XDG_CONFIG_HOME**
 

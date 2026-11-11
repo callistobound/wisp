@@ -111,8 +111,8 @@ optimization level Wisp is compiled with. If Wisp is compiled with `Debug`
 optimizations debug logs will be output to `stderr`. If Wisp is compiled with
 any other optimization the debug logs will not be output to `stderr`.
 
-Wisp also checks the `GHOSTTY_LOG` environment variable (Wisp keeps the
-`GHOSTTY_` prefix for compatibility). It can be used to control which
+Wisp also checks the `WISP_LOG` environment variable (`GHOSTTY_LOG` is still
+read as a fallback). It can be used to control which
 destinations receive logs. Wisp currently defines two
 destinations:
 
@@ -121,8 +121,8 @@ destinations:
 
 Combine values with a comma to enable multiple destinations. Prefix a
 destination with `no-` to disable it. Enabling and disabling destinations
-can be done at the same time. Setting `GHOSTTY_LOG` to `true` will enable all
-destinations. Setting `GHOSTTY_LOG` to `false` will disable all destinations.
+can be done at the same time. Setting `WISP_LOG` to `true` will enable all
+destinations. Setting `WISP_LOG` to `false` will disable all destinations.
 
 ## Linting
 

@@ -8,6 +8,8 @@ This README is meant as developer documentation and not as
 user documentation. For user documentation, see the main
 README or [ghostty.org](https://ghostty.org/docs)
 
+Scripts read `WISP_*` variables first and fall back to `GHOSTTY_*`.
+
 ## Implementation Details
 
 ### Bash
@@ -90,7 +92,7 @@ so `WISP_RESOURCES_DIR` environment variable cannot be used.
 Here is an example of `config.nu` with default `WISP_RESOURCES_DIR` for macOS:
 
 ```nushell
-source /Applications/Ghostty.app/Contents/Resources/ghostty/shell-integration/nushell/vendor/autoload/ghostty.nu
+source /Applications/Wisp.app/Contents/Resources/ghostty/shell-integration/nushell/vendor/autoload/ghostty.nu
 use ghostty *
 ```
 
