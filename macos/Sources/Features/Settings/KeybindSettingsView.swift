@@ -44,6 +44,11 @@ struct KeybindSettingsView: View {
         return chips.sorted { $0.key < $1.key }.map { Row(action: $0.key, chips: $0.value) }
     }
 
+    /// The line a recorded trigger adds.
+    static func binding(trigger: String, action: String, global: Bool) -> String {
+        "\(global ? "global:" : "")\(trigger)=\(action)"
+    }
+
     static func filter(_ rows: [Row], query: String) -> [Row] {
         let query = query.trimmingCharacters(in: .whitespaces)
         return query.isEmpty ? rows : rows.filter { $0.action.localizedCaseInsensitiveContains(query) }
@@ -54,7 +59,7 @@ struct KeybindSettingsView: View {
     static func removal(of chip: Chip, target: String) -> (op: ghostty_config_edit_op_e, value: String, file: String)? {
         switch chip.source {
         case .file(let path, _) where !chip.chained: (GHOSTTY_CONFIG_EDIT_REMOVE, chip.value, path)
-        case .file, .default, .other: (GHOSTTY_CONFIG_EDIT_ADD, "\(chip.trigger)=unbind", target)
+        case .file, .default, .other: (GHOSTTY_CONFIG_EDIT_ADD, "\(Shortcut.prefixes(chip.trigger).keys)=unbind", target)
         case .theme, .cli: nil
         }
     }
@@ -86,6 +91,7 @@ private struct KeybindRowView: View {
     @State private var selection: String
     @State private var captured: String?
     @State private var held: NSEvent.ModifierFlags = []
+    @State private var global = false
     @State private var error: String?
 
     init(
@@ -127,6 +133,7 @@ private struct KeybindRowView: View {
                     Button("Record") {
                         captured = nil
                         held = []
+                        global = false
                         recordingAction = row.action
                     }
                 }
@@ -154,12 +161,21 @@ private struct KeybindRowView: View {
             .frame(width: 180, height: 22)
             .background(RoundedRectangle(cornerRadius: 5).stroke(Color.accentColor))
 
+            Toggle("Global", isOn: $global)
+                .toggleStyle(.checkbox)
+                .help("Works even when Wisp isn't focused")
             Button("Accept") {
                 guard let captured else { return }
-                if edit((GHOSTTY_CONFIG_EDIT_ADD, "\(captured)=\(row.action)", target)) { stopRecording() }
+                let line = KeybindSettingsView.binding(trigger: captured, action: row.action, global: global)
+                if edit((GHOSTTY_CONFIG_EDIT_ADD, line, target)) { stopRecording() }
             }
             .disabled(captured == nil)
             Button("Cancel", action: stopRecording)
+        }
+        if global && !AXIsProcessTrusted() {
+            Text("Global shortcuts need Accessibility access for Wisp in System Settings › Privacy & Security.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         if let captured, let other = usedBy(captured) {
             Text("⚠ \(Shortcut.display(captured)) is already used by \(other).")
@@ -204,6 +220,9 @@ private struct ChipView: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            if Shortcut.isGlobal(chip.trigger) {
+                Image(systemName: "globe").help("Global: works even when Wisp isn't focused")
+            }
             Text(Shortcut.display(chip.trigger))
             if let remove {
                 Button(action: remove) {

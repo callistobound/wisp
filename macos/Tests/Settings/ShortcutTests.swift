@@ -103,7 +103,7 @@ struct ShortcutTests {
         #expect(chip.isDefault)
         let edit = try #require(KeybindSettingsView.removal(of: chip, target: "/t"))
         #expect(edit.op == GHOSTTY_CONFIG_EDIT_ADD && edit.file == "/t")
-        #expect(edit.value == "\(chip.trigger)=unbind")
+        #expect(edit.value == "\(Shortcut.prefixes(chip.trigger).keys)=unbind")
     }
 
     @Test @MainActor func unboundActionsHaveRows() throws {
@@ -113,6 +113,33 @@ struct ShortcutTests {
         let quick = try #require(rows.first { $0.action == "toggle_quick_terminal" })
         #expect(quick.chips.isEmpty)
         #expect(Set(rows.map(\.action)).count == rows.count)
+    }
+
+    @Test func globalPrefix() {
+        #expect(Shortcut.isGlobal("global:super+backquote"))
+        #expect(Shortcut.isGlobal("unconsumed:global:ctrl+a"))
+        #expect(!Shortcut.isGlobal("performable:super+v"))
+        #expect(Shortcut.display("global:super+backquote") == Shortcut.display("super+backquote"))
+        #expect(KeybindSettingsView.binding(trigger: "super+backquote", action: "toggle_quick_terminal", global: true)
+            == "global:super+backquote=toggle_quick_terminal")
+        #expect(KeybindSettingsView.binding(trigger: "super+t", action: "new_tab", global: false) == "super+t=new_tab")
+    }
+
+    @Test func unbindingDropsPrefixes() {
+        let chip = KeybindSettingsView.Chip(
+            value: "performable:super+v=paste_from_clipboard", trigger: "performable:super+v", source: .default)
+        #expect(KeybindSettingsView.removal(of: chip, target: "/t")?.value == "super+v=unbind")
+    }
+
+    @Test @MainActor func globalBindingKeepsItsFileSource() throws {
+        let config = try TemporaryConfig("keybind = global:super+backquote=toggle_quick_terminal\n")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        let option = try #require(m.options.first { $0.key == "keybind" })
+        let row = try #require(KeybindSettingsView.rows(option).first { $0.action == "toggle_quick_terminal" })
+        let chip = try #require(row.chips.first)
+        #expect(Shortcut.isGlobal(chip.trigger))
+        #expect(chip.source == .file(path: path, line: 1))
     }
 
     @Test func filterMatchesActionName() {

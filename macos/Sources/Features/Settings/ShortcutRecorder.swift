@@ -90,11 +90,24 @@ enum Shortcut {
         "home": "↖", "end": "↘", "page_up": "⇞", "page_down": "⇟",
     ]
 
+    /// "global:super+a" -> (["global:"], "super+a").
+    static func prefixes(_ trigger: String) -> (flags: [String], keys: String) {
+        var t = Substring(trigger)
+        var out: [String] = []
+        while let flag = flags.first(where: { t.hasPrefix($0) }) {
+            out.append(flag)
+            t = t.dropFirst(flag.count)
+        }
+        return (out, String(t))
+    }
+
+    static func isGlobal(_ trigger: String) -> Bool {
+        prefixes(trigger).flags.contains("global:")
+    }
+
     /// "ctrl+shift+a" -> "⌃⇧A", "ctrl+a>n" -> "⌃A then N".
     static func display(_ trigger: String) -> String {
-        var t = Substring(trigger)
-        while let flag = flags.first(where: { t.hasPrefix($0) }) { t = t.dropFirst(flag.count) }
-        return t.split(separator: ">").map { chord(String($0)) }.joined(separator: " then ")
+        prefixes(trigger).keys.split(separator: ">").map { chord(String($0)) }.joined(separator: " then ")
     }
 
     private static func chord(_ s: String) -> String {
