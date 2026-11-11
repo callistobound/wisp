@@ -63,6 +63,7 @@ emit_exe: bool = false,
 emit_helpgen: bool = false,
 emit_lib_vt: bool = false,
 emit_macos_app: bool = false,
+macos_codesign_identity: ?[]const u8 = null,
 emit_terminfo: bool = false,
 emit_termcap: bool = false,
 emit_test_exe: bool = false,
@@ -635,6 +636,13 @@ pub fn init(b: *std.Build, versions: Versions) !Config {
         "emit-macos-app",
         "Build and install the macOS app bundle.",
     ) orelse !config.emit_lib_vt and config.emit_xcframework;
+
+    config.macos_codesign_identity = b.option(
+        []const u8,
+        "macos-codesign-identity",
+        "Sign the macOS app with this identity instead of ad hoc, so " ++
+            "permissions such as Accessibility survive rebuilds.",
+    );
 
     //---------------------------------------------------------------
     // System Packages

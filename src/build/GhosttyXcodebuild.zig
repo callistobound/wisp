@@ -75,6 +75,11 @@ pub fn init(
         // to xcodebuild.
         if (xc_arch) |arch| step.addArgs(&.{ "-arch", arch });
 
+        if (config.macos_codesign_identity) |id| step.addArgs(&.{
+            "CODE_SIGN_STYLE=Manual",
+            b.fmt("CODE_SIGN_IDENTITY={s}", .{id}),
+        });
+
         // We need the xcframework
         deps.xcframework.addStepDependencies(&step.step);
 
