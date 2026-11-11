@@ -3,7 +3,7 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.openURL) var openURL
 
-    private let githubURL = URL(string: "https://github.com/ghostty-org/ghostty")
+    static let githubURL = URL(string: "https://github.com/callistobound/wisp")
     private let docsURL = URL(string: "https://ghostty.org/docs")
 
     /// Read the commit from the bundle.
@@ -105,7 +105,7 @@ struct AboutView: View {
                         PropertyRow(label: "Build", text: build)
                     }
                     if let commit, commit != "",
-                       let url = githubURL?.appendingPathComponent("/commits/\(commit)") {
+                       let url = Self.githubURL?.appendingPathComponent("/commits/\(commit)") {
                         PropertyRow(label: "Commit", text: commit, url: url)
                     }
                 }
@@ -117,7 +117,7 @@ struct AboutView: View {
                             openURL(url)
                         }
                     }
-                    if let url = githubURL {
+                    if let url = Self.githubURL {
                         Button("GitHub") {
                             openURL(url)
                         }
