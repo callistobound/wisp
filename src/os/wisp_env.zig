@@ -27,7 +27,8 @@ pub fn getPosix(environ: Environ, comptime suffix: []const u8) ?[:0]const u8 {
     return environ.getPosix("WISP_" ++ suffix) orelse environ.getPosix("GHOSTTY_" ++ suffix);
 }
 
-/// Sets `WISP_<suffix>` and `GHOSTTY_<suffix>` for public variables.
+/// Sets `WISP_<suffix>` and `GHOSTTY_<suffix>`. Handoff variables use both
+/// too: an inherited `GHOSTTY_RESOURCES_DIR` can load upstream scripts.
 pub fn putPublic(
     env: *Environ.Map,
     comptime suffix: []const u8,
@@ -35,15 +36,6 @@ pub fn putPublic(
 ) Allocator.Error!void {
     try env.put("WISP_" ++ suffix, value);
     try env.put("GHOSTTY_" ++ suffix, value);
-}
-
-/// Sets only `WISP_<suffix>`, for private shell-integration handoff.
-pub fn putPrivate(
-    env: *Environ.Map,
-    comptime suffix: []const u8,
-    value: []const u8,
-) Allocator.Error!void {
-    try env.put("WISP_" ++ suffix, value);
 }
 
 /// Removes `WISP_<suffix>` and `GHOSTTY_<suffix>`.
@@ -120,16 +112,6 @@ test "wisp_env: putPublic" {
     try putPublic(&env, "TEST", "v");
     try testing.expectEqualStrings("v", env.get("WISP_TEST").?);
     try testing.expectEqualStrings("v", env.get("GHOSTTY_TEST").?);
-}
-
-test "wisp_env: putPrivate" {
-    const testing = std.testing;
-    var env: Environ.Map = .init(testing.allocator);
-    defer env.deinit();
-
-    try putPrivate(&env, "TEST", "v");
-    try testing.expectEqualStrings("v", env.get("WISP_TEST").?);
-    try testing.expect(env.get("GHOSTTY_TEST") == null);
 }
 
 test "wisp_env: remove" {
