@@ -100,6 +100,30 @@ struct SettingsModelTests {
         #expect(m.visibleOptions.map(\.key) == ["window-padding-x"])
     }
 
+    @Test func selectedFileShowsItsSettings() throws {
+        let config = try TemporaryConfig("copy-on-select = clipboard\nkeybind = super+;=toggle_quick_terminal\n")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        m.selectedSection = nil
+        m.selectedFile = path
+        let keys = m.visibleOptions.map(\.key)
+        #expect(keys.contains("copy-on-select"))
+        #expect(keys.contains("keybind"))
+    }
+
+    @Test func sidebarPickClearsSearch() throws {
+        let config = try TemporaryConfig("copy-on-select = clipboard\n")
+        let path = config.temporaryFile.path()
+        let m = SettingsModel(config: config, defaultTarget: path)
+        m.search = "quick"
+        m.select(file: path)
+        #expect(m.search.isEmpty && m.selectedSection == nil)
+        #expect(m.visibleOptions.map(\.key) == ["copy-on-select"])
+        m.search = "quick"
+        m.select(section: .font)
+        #expect(m.search.isEmpty && m.selectedFile == nil && m.selectedSection == .font)
+    }
+
     // MARK: - Integration
 
     @Test func reloadClearsMissingSelectedFile() throws {

@@ -14,15 +14,9 @@ struct SettingsView: View {
             get: { model.selectedFile.map(SidebarItem.file) ?? model.selectedSection.map(SidebarItem.section) },
             set: { item in
                 switch item {
-                case .section(let section):
-                    model.selectedFile = nil
-                    model.selectedSection = section
-                case .file(let file):
-                    model.selectedSection = nil
-                    model.selectedFile = file
-                case nil:
-                    model.selectedFile = nil
-                    model.selectedSection = nil
+                case .section(let section): model.select(section: section)
+                case .file(let file): model.select(file: file)
+                case nil: model.select()
                 }
             })
     }

@@ -89,6 +89,13 @@ final class SettingsModel: ObservableObject {
 
     // MARK: - Filtering
 
+    /// Sidebar picks start fresh, so a leftover search can't hide everything.
+    func select(section: SettingsSection? = nil, file: String? = nil) {
+        search = ""
+        selectedSection = section
+        selectedFile = file
+    }
+
     var visibleOptions: [SettingsOption] {
         let query = search.trimmingCharacters(in: .whitespaces)
         return options.filter { option in

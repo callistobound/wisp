@@ -161,11 +161,7 @@ private struct SettingsControl: View {
                 repeatable
 
             case .keybind:
-                Button("Edit in Keyboard Shortcuts") {
-                    model.search = ""
-                    model.selectedFile = nil
-                    model.selectedSection = .keybindings
-                }
+                Button("Edit in Keyboard Shortcuts") { model.select(section: .keybindings) }
 
             case .int, .float, .string, .path, .other:
                 TextField(option.defaults.first ?? "", text: $text)
