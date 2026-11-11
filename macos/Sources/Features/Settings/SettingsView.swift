@@ -79,14 +79,27 @@ struct SettingsView: View {
     @ViewBuilder
     private var content: some View {
         if model.search.isEmpty, model.selectedFile == nil, model.selectedSection == .keybindings {
-            KeybindSettingsView(model: model)
+            List { KeybindSettingsView(model: model) }
         } else {
             let options = model.visibleOptions
-            if options.isEmpty {
+            let keybinds = model.search.isEmpty || model.selectedFile != nil ? 0 : keybindMatches
+            if options.isEmpty && keybinds == 0 {
                 Text("No matching settings.").foregroundStyle(.secondary)
-            } else {
+            } else if keybinds == 0 {
                 List(options) { SettingsRowView(model: model, option: $0) }
+            } else {
+                List {
+                    if !options.isEmpty {
+                        Section("Settings") { ForEach(options) { SettingsRowView(model: model, option: $0) } }
+                    }
+                    Section("Keybindings") { KeybindSettingsView(model: model, query: model.search) }
+                }
             }
         }
+    }
+
+    private var keybindMatches: Int {
+        guard let option = model.options.first(where: { $0.key == "keybind" }) else { return 0 }
+        return KeybindSettingsView.filter(KeybindSettingsView.rows(option), query: model.search).count
     }
 }

@@ -106,6 +106,23 @@ struct ShortcutTests {
         #expect(edit.value == "\(chip.trigger)=unbind")
     }
 
+    @Test @MainActor func unboundActionsHaveRows() throws {
+        let m = SettingsModel(config: try TemporaryConfig(""), defaultTarget: "/t")
+        let option = try #require(m.options.first { $0.key == "keybind" })
+        let rows = KeybindSettingsView.rows(option)
+        let quick = try #require(rows.first { $0.action == "toggle_quick_terminal" })
+        #expect(quick.chips.isEmpty)
+        #expect(Set(rows.map(\.action)).count == rows.count)
+    }
+
+    @Test func filterMatchesActionName() {
+        let rows = ["new_tab", "toggle_quick_terminal", "toggle_fullscreen"].map {
+            KeybindSettingsView.Row(action: $0, chips: [])
+        }
+        #expect(KeybindSettingsView.filter(rows, query: " Quick ").map(\.action) == ["toggle_quick_terminal"])
+        #expect(KeybindSettingsView.filter(rows, query: "").count == 3)
+    }
+
     @Test func themeChipCannotBeRemoved() {
         let chip = KeybindSettingsView.Chip(value: "a=new_tab", trigger: "a", source: .theme(path: "/themes/x"))
         #expect(KeybindSettingsView.removal(of: chip, target: "/t") == nil)

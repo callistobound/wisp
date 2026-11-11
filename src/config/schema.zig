@@ -66,12 +66,14 @@ pub fn kindOf(key: Key) Kind {
     }
 }
 
-/// Field names for enum kinds (optional unwrapped), else empty.
+/// Field names for enum kinds (optional unwrapped), bindable actions for
+/// keybind, else empty.
 pub fn enumValues(key: Key) []const [:0]const u8 {
     @setEvalBranchQuota(10_000);
     switch (key) {
         inline else => |k| {
             const T = Unwrapped(@FieldType(Config, @tagName(k)));
+            if (T == Config.Keybinds) return keybind_actions;
             if (@typeInfo(T) != .@"enum") return &.{};
             const names = comptime names: {
                 const fields = @typeInfo(T).@"enum".field_names;
@@ -84,6 +86,25 @@ pub fn enumValues(key: Key) []const [:0]const u8 {
         },
     }
 }
+
+/// Actions with no parameter, and one per value for enum parameters.
+/// Free-form parameters can't be listed; unbind isn't an action to assign.
+const keybind_actions: []const [:0]const u8 = names: {
+    @setEvalBranchQuota(100_000);
+    const Action = @import("../input/Binding.zig").Action;
+    const info = @typeInfo(Action).@"union";
+    var out: []const [:0]const u8 = &.{};
+    for (info.field_names, info.field_types) |name, T| {
+        if (name[0] == '_' or std.mem.eql(u8, name, "unbind")) continue;
+        if (T == void) {
+            out = out ++ .{name};
+        } else if (@typeInfo(T) == .@"enum") {
+            for (@typeInfo(T).@"enum".field_names) |v| out = out ++ .{name ++ ":" ++ v};
+        }
+    }
+    const final = out[0..out.len].*;
+    break :names &final;
+};
 
 pub const Option = struct {
     key: [:0]const u8,
@@ -307,4 +328,24 @@ test "schema: keybind entry sources" {
     }
     try testing.expect(user and dflt);
     try testing.expectEqual(@as(usize, 0), find(&schema, .@"font-size").entry_sources.len);
+}
+
+test "schema: keybind actions" {
+    const testing = std.testing;
+    const Action = @import("../input/Binding.zig").Action;
+    const actions = enumValues(.keybind);
+    var quick = false;
+    var split = false;
+    for (actions) |name| {
+        try testing.expect(name[0] != '_');
+        try testing.expect(!std.mem.eql(u8, name, "unbind"));
+        // Each name round-trips, so it matches how bound actions format.
+        var aw: std.Io.Writer.Allocating = .init(testing.allocator);
+        defer aw.deinit();
+        try (try Action.parse(name)).format(&aw.writer);
+        try testing.expectEqualStrings(name, aw.written());
+        if (std.mem.eql(u8, name, "toggle_quick_terminal")) quick = true;
+        if (std.mem.eql(u8, name, "goto_split:left")) split = true;
+    }
+    try testing.expect(quick and split);
 }

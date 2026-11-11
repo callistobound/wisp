@@ -1,9 +1,12 @@
 import SwiftUI
 import GhosttyKit
 
-/// The Keybindings section: one row per action, with a chip per trigger.
+/// One row per action, with a chip per trigger. List content, so search
+/// results can show it beside settings.
 struct KeybindSettingsView: View {
     @ObservedObject var model: SettingsModel
+    /// Shows only actions containing this; empty shows all.
+    var query = ""
     /// The action being recorded; one recorder at a time.
     @State private var recording: String?
 
@@ -24,7 +27,7 @@ struct KeybindSettingsView: View {
         var id: String { action }
     }
 
-    /// Rows for every action in `values` or `defaults`, sorted by action.
+    /// Rows for every action in `values`, `defaults` or `enumValues`, sorted by action.
     static func rows(_ option: SettingsOption) -> [Row] {
         var chips: [String: [Chip]] = [:]
         for (i, value) in option.values.enumerated() {
@@ -37,7 +40,13 @@ struct KeybindSettingsView: View {
             guard let (trigger, action) = Shortcut.split(binding: value), trigger != "chain" else { continue }
             if chips[action] == nil { chips[action] = [] }
         }
+        for action in option.enumValues where chips[action] == nil { chips[action] = [] }
         return chips.sorted { $0.key < $1.key }.map { Row(action: $0.key, chips: $0.value) }
+    }
+
+    static func filter(_ rows: [Row], query: String) -> [Row] {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty ? rows : rows.filter { $0.action.localizedCaseInsensitiveContains(query) }
     }
 
     /// File-set chips are removed from their file. Defaults, chained heads and lines
@@ -53,7 +62,7 @@ struct KeybindSettingsView: View {
     var body: some View {
         if let option = model.options.first(where: { $0.key == "keybind" }) {
             let rows = Self.rows(option)
-            List(rows) { row in
+            ForEach(Self.filter(rows, query: query)) { row in
                 KeybindRowView(model: model, row: row, recording: $recording) { trigger in
                     let shown = Shortcut.display(trigger)
                     return rows.first { other in
