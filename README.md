@@ -37,7 +37,7 @@ section and the crash report paths and commands below.
 ## Wisp Releases
 
 macOS builds are published to
-[GitHub Releases](https://github.com/jamesboehmer/wisp/releases) and update
+[GitHub Releases](https://github.com/callistobound/wisp/releases) and update
 themselves. Install the first one by hand (it isn't notarized, so allow it once
 in System Settings › Privacy & Security). `auto-update-channel` picks the feed:
 

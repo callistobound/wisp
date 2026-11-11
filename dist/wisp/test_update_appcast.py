@@ -64,7 +64,7 @@ class UpdateAppcastTest(unittest.TestCase):
         (item,) = items(publish(None, "tip", 1))
         description = item.find("description").text
         self.assertIn("fd6bc12", description)
-        self.assertIn("https://github.com/jamesboehmer/wisp/commit/fd6bc12", description)
+        self.assertIn("https://github.com/callistobound/wisp/commit/fd6bc12", description)
 
 
 if __name__ == "__main__":

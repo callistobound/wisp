@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Disables every active workflow in jamesboehmer/wisp except Wisp's own
+# Disables every active workflow in callistobound/wisp except Wisp's own
 # (.github/workflows/wisp-*). Run after merging upstream. --dry-run lists
 # what would be disabled.
 set -euo pipefail
 
-repo=jamesboehmer/wisp
+repo=callistobound/wisp
 dry_run=false
 [ "${1:-}" = "--dry-run" ] && dry_run=true
 

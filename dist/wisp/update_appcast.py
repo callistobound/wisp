@@ -18,7 +18,7 @@ NS = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
 for _prefix, _uri in NS.items():
     ET.register_namespace(_prefix, _uri)
 
-REPO = "https://github.com/jamesboehmer/wisp"
+REPO = "https://github.com/callistobound/wisp"
 KEEP = {"stable": 15, "tip": 1}
 PUBDATE_FORMAT = "%a, %d %b %Y %H:%M:%S %z"
 
