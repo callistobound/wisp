@@ -30,8 +30,9 @@ command, with a `ghostty` alias next to it on Linux and macOS (on Windows only
 `~/.config/ghostty` if only that exists. Wisp keeps the Ghostty name for
 `xterm-ghostty`, `share/ghostty` resources and shell integration for
 compatibility. Environment variables are `WISP_*`; `GHOSTTY_*` is still read as
-a fallback, and the public ones are also exported under `GHOSTTY_*`. The rest of this document describes
-upstream Ghostty, except for the crash report paths and commands below.
+a fallback, and the public ones are also exported under `GHOSTTY_*`. The rest
+of this document describes upstream Ghostty, except for the crash report paths
+and commands below.
 
 ### Upgrading from Ghostty
 

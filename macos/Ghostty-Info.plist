@@ -52,7 +52,7 @@
 	<string></string>
 	<key>LSEnvironment</key>
 	<dict>
-		<key>GHOSTTY_MAC_LAUNCH_SOURCE</key>
+		<key>WISP_MAC_LAUNCH_SOURCE</key>
 		<string>app</string>
 	</dict>
 	<key>MDItemKeywords</key>
