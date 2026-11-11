@@ -185,4 +185,26 @@ struct SettingsModelTests {
         #expect(SourcePicker.resynced("/b", to: .file(path: "/a", line: 1)) == "/b")
         #expect(SourcePicker.resynced("", to: .default) == "")
     }
+
+    @Test func pickerCompactDependsOnWidth() {
+        let files = ["/home/u/.config/wisp/config"]
+        #expect(SourcePicker.isCompact(width: 300, files: files))
+        #expect(!SourcePicker.isCompact(width: 2000, files: files))
+        // More files need more room for the segmented form.
+        let many = (1...8).map { "/home/u/.config/wisp/include-\($0).ghostty" }
+        let wide = SourcePicker.segmentedWidth(files: files)
+        #expect(SourcePicker.segmentedWidth(files: many) > wide)
+        #expect(SourcePicker.isCompact(width: wide + 400, files: many))
+    }
+
+    @Test func modelStartsOnFontSection() throws {
+        let m = try model()
+        #expect(m.selectedSection == .font)
+    }
+
+    @Test func helpSplitsFirstParagraph() {
+        #expect(HelpText.split("One.") == HelpText.Parts(first: "One.", rest: nil))
+        #expect(HelpText.split("One.\n\nTwo.\n\nThree.") == HelpText.Parts(first: "One.", rest: "Two.\n\nThree."))
+        #expect(HelpText.split("") == HelpText.Parts(first: "", rest: nil))
+    }
 }

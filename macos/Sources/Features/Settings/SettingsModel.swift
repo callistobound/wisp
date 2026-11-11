@@ -27,7 +27,7 @@ final class SettingsModel: ObservableObject {
     @Published var options: [SettingsOption] = []
     @Published var files: [String] = []
     @Published var search: String = ""
-    @Published var selectedSection: SettingsSection?
+    @Published var selectedSection: SettingsSection? = .font
     @Published var selectedFile: String?
 
     let defaultTarget: String

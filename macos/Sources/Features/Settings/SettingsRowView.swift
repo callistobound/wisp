@@ -75,23 +75,42 @@ struct SettingsRowView: View {
 }
 
 /// The first paragraph of help, with the rest behind "More".
+/// A plain button, since DisclosureGroup hides its arrow inside a List row.
 struct HelpText: View {
     let help: String
+    @State private var expanded = false
+
+    struct Parts: Equatable {
+        let first: String
+        let rest: String?
+    }
+
+    static func split(_ help: String) -> Parts {
+        let paragraphs = help.components(separatedBy: "\n\n")
+        let rest = paragraphs.dropFirst().joined(separator: "\n\n")
+        return Parts(first: paragraphs.first ?? "", rest: rest.isEmpty ? nil : rest)
+    }
 
     var body: some View {
-        let paragraphs = help.components(separatedBy: "\n\n")
-        if let first = paragraphs.first, !first.isEmpty {
+        let parts = Self.split(help)
+        if !parts.first.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
-                Text(first).font(.callout).foregroundStyle(.secondary)
-                if paragraphs.count > 1 {
-                    DisclosureGroup("More") {
-                        Text(paragraphs.dropFirst().joined(separator: "\n\n"))
+                Text(parts.first).font(.callout).foregroundStyle(.secondary)
+                if let rest = parts.rest {
+                    Button {
+                        expanded.toggle()
+                    } label: {
+                        Label(expanded ? "Less" : "More", systemImage: expanded ? "chevron.down" : "chevron.right")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.link)
+                    if expanded {
+                        Text(rest)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .font(.callout)
                 }
             }
         }

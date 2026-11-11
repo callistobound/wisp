@@ -45,10 +45,13 @@ struct SettingsView: View {
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
-            VStack(spacing: 0) {
-                header.padding(10)
-                Divider()
-                content.frame(maxWidth: .infinity, maxHeight: .infinity)
+            GeometryReader { geo in
+                VStack(spacing: 0) {
+                    header.padding(10)
+                    Divider()
+                    content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .environment(\.sourcePickerCompact, SourcePicker.isCompact(width: geo.size.width, files: model.files))
             }
         }
         .onAppear {
