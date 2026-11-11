@@ -636,7 +636,7 @@ const Subprocess = struct {
         // If we have a resources dir then set our env var
         if (cfg.resources_dir) |dir| {
             log.info("found Ghostty resources dir: {s}", .{dir});
-            try env.put("GHOSTTY_RESOURCES_DIR", dir);
+            try internal_os.wisp_env.putPublic(&env, "RESOURCES_DIR", dir);
         }
 
         // Set our TERM var. This is a bit complicated because we want to use
@@ -690,7 +690,7 @@ const Subprocess = struct {
             // We always set this so that if the shell overwrites the path
             // scripts still have a way to find the Ghostty binary when
             // running in Ghostty.
-            try env.put("GHOSTTY_BIN_DIR", exe_dir);
+            try internal_os.wisp_env.putPublic(&env, "BIN_DIR", exe_dir);
 
             // Append if we have a path. We want to append so that ghostty is
             // the last priority in the path. If we don't have a path set
@@ -768,7 +768,7 @@ const Subprocess = struct {
                     else => "sh",
                 } };
 
-            // Always set up shell features (GHOSTTY_SHELL_FEATURES). These are
+            // Always set up shell features (WISP_SHELL_FEATURES). These are
             // used by both automatic and manual shell integrations.
             try shell_integration.setupFeatures(
                 &env,

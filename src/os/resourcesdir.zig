@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const global = @import("../global.zig");
+const wisp_env = @import("wisp_env.zig");
 
 pub const ResourcesDir = struct {
     /// Avoid accessing these directly, use the app() and host() methods instead.
@@ -39,7 +40,7 @@ pub const ResourcesDir = struct {
 /// This is highly Ghostty-specific and can likely be generalized at
 /// some point but we can cross that bridge if we ever need to.
 pub fn resourcesDir(alloc: Allocator) !ResourcesDir {
-    // Use the GHOSTTY_RESOURCES_DIR environment variable in release builds.
+    // Use WISP_RESOURCES_DIR (or GHOSTTY_RESOURCES_DIR) in release builds.
     //
     // In debug builds we try using terminfo detection first instead, since
     // if debug Ghostty is launched by an older version of Ghostty, it
@@ -49,7 +50,7 @@ pub fn resourcesDir(alloc: Allocator) !ResourcesDir {
     // Note: we ALWAYS want to allocate here because the result is always
     // freed, do not try to use internal_os.getenv or posix getenv.
     if (comptime builtin.mode != .debug) env: {
-        const dir = global.environ().getAlloc(alloc, "GHOSTTY_RESOURCES_DIR") catch |err| switch (err) {
+        const dir = wisp_env.getAlloc(global.environ(), alloc, "RESOURCES_DIR") catch |err| switch (err) {
             error.EnvironmentVariableMissing => break :env,
             else => return err,
         };
@@ -111,7 +112,7 @@ pub fn resourcesDir(alloc: Allocator) !ResourcesDir {
     // If terminfo detection failed in debug builds (somehow),
     // fallback and use the provided resources dir.
     if (comptime builtin.mode == .debug) {
-        if (global.environ().getAlloc(alloc, "GHOSTTY_RESOURCES_DIR")) |dir| {
+        if (wisp_env.getAlloc(global.environ(), alloc, "RESOURCES_DIR")) |dir| {
             if (dir.len > 0) return .{ .app_path = dir };
         } else |err| switch (err) {
             error.InvalidWtf8, error.EnvironmentVariableMissing => {},

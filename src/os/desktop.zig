@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_config = @import("../build_config.zig");
 const global = @import("../global.zig");
+const wisp_env = @import("wisp_env.zig");
 
 const c = @import("posix_c");
 
@@ -23,8 +24,10 @@ pub fn launchedFromDesktop() bool {
             // app bundle (i.e. via open) then we still treat it as if it
             // was launched from the desktop.
             if (build_config.artifact == .lib) lib: {
-                const env = "GHOSTTY_MAC_LAUNCH_SOURCE";
-                const source = global.environ().getPosix(env) orelse break :lib;
+                const source = wisp_env.getPosix(
+                    global.environ(),
+                    "MAC_LAUNCH_SOURCE",
+                ) orelse break :lib;
 
                 // Source can be "app", "cli", or "zig_run". We assume
                 // its the desktop only if its "app". We may want to do

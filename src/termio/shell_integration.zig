@@ -231,7 +231,7 @@ pub fn setupFeatures(
     }
 
     if (writer.end > 0) {
-        try env.put("GHOSTTY_SHELL_FEATURES", buf[0..writer.end]);
+        try internal_os.wisp_env.putPublic(env, "SHELL_FEATURES", buf[0..writer.end]);
     }
 }
 
@@ -248,6 +248,7 @@ test "setup features" {
         defer env.deinit();
 
         try setupFeatures(&env, .{ .cursor = true, .sudo = true, .title = true, .@"ssh-env" = true, .@"ssh-terminfo" = true, .path = true }, true);
+        try testing.expectEqualStrings("cursor:blink,path,ssh-env,ssh-terminfo,sudo,title", env.get("WISP_SHELL_FEATURES").?);
         try testing.expectEqualStrings("cursor:blink,path,ssh-env,ssh-terminfo,sudo,title", env.get("GHOSTTY_SHELL_FEATURES").?);
     }
 
@@ -257,6 +258,7 @@ test "setup features" {
         defer env.deinit();
 
         try setupFeatures(&env, std.mem.zeroes(config.ShellIntegrationFeatures), true);
+        try testing.expect(env.get("WISP_SHELL_FEATURES") == null);
         try testing.expect(env.get("GHOSTTY_SHELL_FEATURES") == null);
     }
 
@@ -266,6 +268,7 @@ test "setup features" {
         defer env.deinit();
 
         try setupFeatures(&env, .{ .cursor = false, .sudo = true, .title = false, .@"ssh-env" = true, .@"ssh-terminfo" = false, .path = false }, true);
+        try testing.expectEqualStrings("ssh-env,sudo", env.get("WISP_SHELL_FEATURES").?);
         try testing.expectEqualStrings("ssh-env,sudo", env.get("GHOSTTY_SHELL_FEATURES").?);
     }
 
@@ -274,6 +277,7 @@ test "setup features" {
         var env = EnvMap.init(alloc);
         defer env.deinit();
         try setupFeatures(&env, .{ .cursor = true, .sudo = false, .title = false, .@"ssh-env" = false, .@"ssh-terminfo" = false, .path = false }, true);
+        try testing.expectEqualStrings("cursor:blink", env.get("WISP_SHELL_FEATURES").?);
         try testing.expectEqualStrings("cursor:blink", env.get("GHOSTTY_SHELL_FEATURES").?);
     }
 
@@ -282,6 +286,7 @@ test "setup features" {
         var env = EnvMap.init(alloc);
         defer env.deinit();
         try setupFeatures(&env, .{ .cursor = true, .sudo = false, .title = false, .@"ssh-env" = false, .@"ssh-terminfo" = false, .path = false }, false);
+        try testing.expectEqualStrings("cursor:steady", env.get("WISP_SHELL_FEATURES").?);
         try testing.expectEqualStrings("cursor:steady", env.get("GHOSTTY_SHELL_FEATURES").?);
     }
 }
@@ -364,7 +369,7 @@ fn setupBash(
 
     // Preserve an existing ENV value. We're about to overwrite it.
     if (env.get("ENV")) |v| {
-        try env.put("GHOSTTY_BASH_ENV", v);
+        try internal_os.wisp_env.putPrivate(env, "BASH_ENV", v);
     }
 
     // Set our new ENV to point to our integration script.
@@ -379,13 +384,13 @@ fn setupBash(
         try env.put("ENV", script_path);
     } else |err| {
         log.warn("unable to open {s}: {}", .{ script_path, err });
-        _ = env.swapRemove("GHOSTTY_BASH_ENV");
+        internal_os.wisp_env.remove(env, "BASH_ENV");
         return null;
     }
 
-    try env.put("GHOSTTY_BASH_INJECT", buf[0..inject.end]);
+    try internal_os.wisp_env.putPrivate(env, "BASH_INJECT", buf[0..inject.end]);
     if (rcfile) |v| {
-        try env.put("GHOSTTY_BASH_RCFILE", v);
+        try internal_os.wisp_env.putPrivate(env, "BASH_RCFILE", v);
     }
 
     // In POSIX mode, HISTFILE defaults to ~/.sh_history, so unless we're
@@ -402,7 +407,7 @@ fn setupBash(
                 .{home},
             );
             try env.put("HISTFILE", histfile);
-            try env.put("GHOSTTY_BASH_UNEXPORT_HISTFILE", "1");
+            try internal_os.wisp_env.putPrivate(env, "BASH_UNEXPORT_HISTFILE", "1");
         }
     }
 
@@ -424,7 +429,8 @@ test "bash" {
 
     const command = try setupBash(alloc, .{ .shell = "bash" }, res.path, &env);
     try testing.expectEqualStrings("bash --posix", command.?.shell);
-    try testing.expectEqualStrings("1", env.get("GHOSTTY_BASH_INJECT").?);
+    try testing.expectEqualStrings("1", env.get("WISP_BASH_INJECT").?);
+    try testing.expect(env.get("GHOSTTY_BASH_INJECT") == null);
 
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try testing.expectEqualStrings(
@@ -475,7 +481,8 @@ test "bash: inject flags" {
 
         const command = try setupBash(alloc, .{ .shell = "bash --norc" }, res.path, &env);
         try testing.expectEqualStrings("bash --posix", command.?.shell);
-        try testing.expectEqualStrings("1 --norc", env.get("GHOSTTY_BASH_INJECT").?);
+        try testing.expectEqualStrings("1 --norc", env.get("WISP_BASH_INJECT").?);
+        try testing.expect(env.get("GHOSTTY_BASH_INJECT") == null);
     }
 
     // bash --noprofile
@@ -485,7 +492,8 @@ test "bash: inject flags" {
 
         const command = try setupBash(alloc, .{ .shell = "bash --noprofile" }, res.path, &env);
         try testing.expectEqualStrings("bash --posix", command.?.shell);
-        try testing.expectEqualStrings("1 --noprofile", env.get("GHOSTTY_BASH_INJECT").?);
+        try testing.expectEqualStrings("1 --noprofile", env.get("WISP_BASH_INJECT").?);
+        try testing.expect(env.get("GHOSTTY_BASH_INJECT") == null);
     }
 }
 
@@ -505,14 +513,16 @@ test "bash: rcfile" {
     {
         const command = try setupBash(alloc, .{ .shell = "bash --rcfile profile.sh" }, res.path, &env);
         try testing.expectEqualStrings("bash --posix", command.?.shell);
-        try testing.expectEqualStrings("profile.sh", env.get("GHOSTTY_BASH_RCFILE").?);
+        try testing.expectEqualStrings("profile.sh", env.get("WISP_BASH_RCFILE").?);
+        try testing.expect(env.get("GHOSTTY_BASH_RCFILE") == null);
     }
 
     // bash --init-file
     {
         const command = try setupBash(alloc, .{ .shell = "bash --init-file profile.sh" }, res.path, &env);
         try testing.expectEqualStrings("bash --posix", command.?.shell);
-        try testing.expectEqualStrings("profile.sh", env.get("GHOSTTY_BASH_RCFILE").?);
+        try testing.expectEqualStrings("profile.sh", env.get("WISP_BASH_RCFILE").?);
+        try testing.expect(env.get("GHOSTTY_BASH_RCFILE") == null);
     }
 }
 
@@ -532,7 +542,8 @@ test "bash: HISTFILE" {
 
         _ = try setupBash(alloc, .{ .shell = "bash" }, res.path, &env);
         try testing.expect(std.mem.endsWith(u8, env.get("HISTFILE").?, ".bash_history"));
-        try testing.expectEqualStrings("1", env.get("GHOSTTY_BASH_UNEXPORT_HISTFILE").?);
+        try testing.expectEqualStrings("1", env.get("WISP_BASH_UNEXPORT_HISTFILE").?);
+        try testing.expect(env.get("GHOSTTY_BASH_UNEXPORT_HISTFILE") == null);
     }
 
     // HISTFILE set
@@ -544,6 +555,7 @@ test "bash: HISTFILE" {
 
         _ = try setupBash(alloc, .{ .shell = "bash" }, res.path, &env);
         try testing.expectEqualStrings("my_history", env.get("HISTFILE").?);
+        try testing.expect(env.get("WISP_BASH_UNEXPORT_HISTFILE") == null);
         try testing.expect(env.get("GHOSTTY_BASH_UNEXPORT_HISTFILE") == null);
     }
 }
@@ -563,7 +575,8 @@ test "bash: ENV" {
     try env.put("ENV", "env.sh");
 
     _ = try setupBash(alloc, .{ .shell = "bash" }, res.path, &env);
-    try testing.expectEqualStrings("env.sh", env.get("GHOSTTY_BASH_ENV").?);
+    try testing.expectEqualStrings("env.sh", env.get("WISP_BASH_ENV").?);
+    try testing.expect(env.get("GHOSTTY_BASH_ENV") == null);
 
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try testing.expectEqualStrings(
@@ -620,7 +633,7 @@ test "bash: missing resources" {
 /// their modules from paths in `XDG_DATA_DIRS` env variable.
 ///
 /// The shell-integration path is prepended to `XDG_DATA_DIRS`.
-/// It is also saved in the `GHOSTTY_SHELL_INTEGRATION_XDG_DIR` variable
+/// It is also saved in the `WISP_SHELL_INTEGRATION_XDG_DIR` variable
 /// so that the shell can refer to it and safely remove this directory
 /// from `XDG_DATA_DIRS` when integration is complete.
 fn setupXdgDataDirs(
@@ -649,7 +662,7 @@ fn setupXdgDataDirs(
     // Set an env var so we can remove this from XDG_DATA_DIRS later.
     // This happens in the shell integration config itself. We do this
     // so that our modifications don't interfere with other commands.
-    try env.put("GHOSTTY_SHELL_INTEGRATION_XDG_DIR", integ_path);
+    try internal_os.wisp_env.putPrivate(env, "SHELL_INTEGRATION_XDG_DIR", integ_path);
 
     // We attempt to avoid allocating by using the stack up to 4K.
     // Max stack size is considerably larger on mac
@@ -714,8 +727,9 @@ test "xdg: empty XDG_DATA_DIRS" {
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try testing.expectEqualStrings(
         try std.mem.print(&path_buf, "{s}/shell-integration", .{res.path}),
-        env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR").?,
+        env.get("WISP_SHELL_INTEGRATION_XDG_DIR").?,
     );
+    try testing.expect(env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR") == null);
     try testing.expectEqualStrings(
         try std.mem.print(&path_buf, "{s}/shell-integration:/usr/local/share:/usr/share", .{res.path}),
         env.get("XDG_DATA_DIRS").?,
@@ -744,8 +758,9 @@ test "xdg: existing XDG_DATA_DIRS" {
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try testing.expectEqualStrings(
         try std.mem.print(&path_buf, "{s}/shell-integration", .{res.path}),
-        env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR").?,
+        env.get("WISP_SHELL_INTEGRATION_XDG_DIR").?,
     );
+    try testing.expect(env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR") == null);
     try testing.expectEqualStrings(
         try std.mem.print(&path_buf, "{s}/shell-integration:/opt/share", .{res.path}),
         env.get("XDG_DATA_DIRS").?,
@@ -862,8 +877,9 @@ test "nushell" {
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     try testing.expectEqualStrings(
         try std.mem.print(&path_buf, "{s}/shell-integration", .{res.path}),
-        env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR").?,
+        env.get("WISP_SHELL_INTEGRATION_XDG_DIR").?,
     );
+    try testing.expect(env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR") == null);
     try testing.expectStringStartsWith(
         env.get("XDG_DATA_DIRS").?,
         try std.mem.print(&path_buf, "{s}/shell-integration", .{res.path}),
@@ -892,7 +908,8 @@ test "nushell: unsupported options" {
 
         try testing.expect(try setupNushell(alloc, .{ .shell = cmdline }, res.path, &env) == null);
         try testing.expect(env.get("XDG_DATA_DIRS") != null);
-        try testing.expect(env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR") != null);
+        try testing.expect(env.get("WISP_SHELL_INTEGRATION_XDG_DIR") != null);
+        try testing.expect(env.get("GHOSTTY_SHELL_INTEGRATION_XDG_DIR") == null);
     }
 }
 
@@ -926,7 +943,7 @@ fn setupZsh(
 ) !?config.Command {
     // Preserve an existing ZDOTDIR value. We're about to overwrite it.
     if (env.get("ZDOTDIR")) |old| {
-        try env.put("GHOSTTY_ZSH_ZDOTDIR", old);
+        try internal_os.wisp_env.putPrivate(env, "ZSH_ZDOTDIR", old);
     }
 
     // Set our new ZDOTDIR to point to our shell resource directory.
@@ -966,6 +983,7 @@ test "zsh" {
     const command = try setupZsh(alloc, .{ .shell = "zsh" }, res.path, &env);
     try testing.expectEqualStrings("zsh", command.?.shell);
     try testing.expectEqualStrings(res.shell_path, env.get("ZDOTDIR").?);
+    try testing.expect(env.get("WISP_ZSH_ZDOTDIR") == null);
     try testing.expect(env.get("GHOSTTY_ZSH_ZDOTDIR") == null);
 }
 
@@ -987,7 +1005,8 @@ test "zsh: ZDOTDIR" {
     const command = try setupZsh(alloc, .{ .shell = "zsh" }, res.path, &env);
     try testing.expectEqualStrings("zsh", command.?.shell);
     try testing.expectEqualStrings(res.shell_path, env.get("ZDOTDIR").?);
-    try testing.expectEqualStrings("$HOME/.config/zsh", env.get("GHOSTTY_ZSH_ZDOTDIR").?);
+    try testing.expectEqualStrings("$HOME/.config/zsh", env.get("WISP_ZSH_ZDOTDIR").?);
+    try testing.expect(env.get("GHOSTTY_ZSH_ZDOTDIR") == null);
 }
 
 test "zsh: missing resources" {

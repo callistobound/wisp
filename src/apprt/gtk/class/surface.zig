@@ -1646,7 +1646,7 @@ pub const Surface = extern struct {
             try window.winproto().addSubprocessEnv(&env);
 
             if (window.isQuickTerminal()) {
-                try env.put("GHOSTTY_QUICK_TERMINAL", "1");
+                try internal_os.wisp_env.putPublic(&env, "QUICK_TERMINAL", "1");
             }
         }
 
