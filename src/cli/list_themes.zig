@@ -94,8 +94,9 @@ const ThemeListElement = struct {
 /// `zig-out/share/ghostty/themes` directory. Wisp keeps the Ghostty name
 /// for this directory for compatibility.
 ///
-/// You can also set the `GHOSTTY_RESOURCES_DIR` environment variable to point
-/// to the resources directory.
+/// You can also set the `WISP_RESOURCES_DIR` environment variable to point
+/// to the resources directory (`GHOSTTY_RESOURCES_DIR` is still read as a
+/// fallback).
 ///
 /// Flags:
 ///
