@@ -1,0 +1,133 @@
+name: Wisp Tip
+
+on:
+  push:
+    branches: [downstream]
+  workflow_dispatch:
+
+# Only the newest tip matters.
+concurrency:
+  group: wisp-tip
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  tip:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEED_URL: https://github.com/${{ github.repository }}/releases/download/tip
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Build numbers are the commit count.
+          fetch-depth: 0
+
+      - name: Has a previous tip
+        id: previous
+        run: |
+          if git rev-parse -q --verify refs/tags/tip >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Skip pushes that can't change the app. Manual runs always build.
+      - name: Detect changes since last tip
+        id: changes
+        if: github.event_name == 'push' && steps.previous.outputs.exists == 'true'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          token: ""
+          base: tip
+          predicate-quantifier: "every"
+          filters: |
+            build:
+              - '**'
+              - '!.github/**'
+              - '!docs/**'
+              - '!README.md'
+              - '!CONTRIBUTING.md'
+              - '!HACKING.md'
+              - '!PACKAGING.md'
+              - '!PACKAGING-LIBGHOSTTY.md'
+              - '!AI_POLICY.md'
+              - '!AGENTS.md'
+              - '!CLAUDE.md'
+              - '!LICENSE'
+              - '!CODEOWNERS'
+              - '!.editorconfig'
+              - '!.gitignore'
+              - '!.swiftlint.yml'
+              - '!typos.toml'
+            release:
+              - '.github/workflows/wisp-tip.yml'
+              - '.github/actions/wisp-macos/**'
+
+      - name: Determine skip
+        id: skip
+        run: |
+          if [ "${{ steps.changes.outputs.build }}" = "false" ] &&
+            [ "${{ steps.changes.outputs.release }}" = "false" ]; then
+            echo "Only non-app files changed since the last tip, skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Always a tip version, even if a Wisp release tag is on this commit:
+      # a stable version here would move tip users to the stable feed.
+      - name: Version
+        id: version
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          base=$(sed -n 's/^ *\.version = "\([0-9]*\.[0-9]*\.[0-9]*\).*",/\1/p' build.zig.zon | head -1)
+          test -n "$base"
+          echo "version=$base-downstream+$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        id: build
+        if: steps.skip.outputs.skip != 'true'
+        uses: ./.github/actions/wisp-macos
+        with:
+          version-string: ${{ steps.version.outputs.version }}
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+
+      - name: Update appcast
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+          BUILD: ${{ steps.build.outputs.build }}
+        run: |
+          gh release download tip -p appcast.xml -O appcast-old.xml || true
+          python3 dist/wisp/update_appcast.py \
+            --channel tip \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --commit "$(git rev-parse --short HEAD)" \
+            --url "$FEED_URL/Wisp.dmg" \
+            --signature sign_update.txt \
+            --appcast appcast-old.xml \
+            --out appcast.xml
+
+      - name: Publish
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          git tag -f tip "$GITHUB_SHA"
+          git push -f origin refs/tags/tip
+          if ! gh release view tip >/dev/null 2>&1; then
+            gh release create tip --prerelease --verify-tag \
+              --title "Wisp Tip" \
+              --notes "Built from every push to downstream."
+          fi
+          gh release upload tip Wisp.dmg appcast.xml --clobber
+          gh release edit tip --notes "Wisp $VERSION, built from $GITHUB_SHA."

@@ -1,0 +1,145 @@
+name: Build Wisp for macOS
+description: >-
+  Builds, signs and packages Wisp.app as Wisp.dmg, and signs the DMG for
+  Sparkle into sign_update.txt. Needs a full checkout (fetch-depth: 0) and the
+  SPARKLE_PRIVATE_KEY, MACOS_CERTIFICATE and MACOS_CERTIFICATE_PWD env vars.
+
+inputs:
+  version-string:
+    description: Version to build, e.g. 1.4.1+wisp.1 or 1.4.1-downstream+abc1234.
+    required: true
+
+outputs:
+  version:
+    description: The built app's version.
+    value: ${{ steps.info.outputs.version }}
+  build:
+    description: The build number (commit count).
+    value: ${{ steps.info.outputs.build }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Zig
+      uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+      with:
+        version: 0.17.1
+
+    - name: Select Xcode
+      shell: bash
+      run: |
+        xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+        sudo xcode-select -s "$xcode"
+        xcodebuild -version
+        version=$(xcodebuild -version | awk 'NR==1 {print $2}')
+        if [ "$(printf '%s\n' 26.2 "$version" | sort -V | head -1)" != 26.2 ]; then
+          echo "Xcode $version is older than 26.2" >&2
+          exit 1
+        fi
+
+    - name: Setup Sparkle
+      shell: bash
+      env:
+        SPARKLE_VERSION: 2.9.6
+      run: |
+        mkdir -p .action/sparkle
+        cd .action/sparkle || exit 1
+        curl -fL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-for-Swift-Package-Manager.zip" > sparkle.zip
+        unzip -q sparkle.zip
+        echo "$(pwd)/bin" >> "$GITHUB_PATH"
+
+    - name: Build GhosttyKit
+      shell: bash
+      env:
+        VERSION_STRING: ${{ inputs.version-string }}
+      run: |
+        zig build -Doptimize=ReleaseFast -Demit-macos-app=false -Dversion-string="$VERSION_STRING"
+
+    - name: Build Wisp.app
+      shell: bash
+      run: |
+        cd macos || exit 1
+        xcodebuild -target Ghostty -configuration Release
+
+    # Can't run the app yet: until it's re-signed below, its hardened
+    # runtime refuses Sparkle's differently signed framework.
+    - name: Build info
+      id: info
+      shell: bash
+      env:
+        VERSION_STRING: ${{ inputs.version-string }}
+      run: |
+        echo "version=$VERSION_STRING" >> "$GITHUB_OUTPUT"
+        echo "build=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+    # The build number is the commit count, so it always grows (we merge
+    # upstream, never rebase). Published builds check for updates.
+    - name: Update Info.plist
+      shell: bash
+      env:
+        VERSION: ${{ steps.info.outputs.version }}
+        BUILD: ${{ steps.info.outputs.build }}
+      run: |
+        plist=macos/build/Release/Wisp.app/Contents/Info.plist
+        /usr/libexec/PlistBuddy -c "Set :GhosttyCommit $(git rev-parse --short HEAD)" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$plist"
+        /usr/libexec/PlistBuddy -c "Delete :SUEnableAutomaticChecks" "$plist"
+
+    - name: Codesign
+      shell: bash
+      env:
+        IDENTITY: "Apple Development: James Boehmer (3DY7FZUT45)"
+      run: |
+        echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+        keychain_pwd=$(uuidgen)
+        security create-keychain -p "$keychain_pwd" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "$keychain_pwd" build.keychain
+        security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_pwd" build.keychain
+        rm certificate.p12
+
+        # Sparkle's parts first, then the app. The XPC services are unused
+        # (Wisp isn't sandboxed) but still need signing.
+        app=macos/build/Release/Wisp.app
+        sparkle=$app/Contents/Frameworks/Sparkle.framework
+        for part in \
+          "$sparkle/Versions/B/XPCServices/Downloader.xpc" \
+          "$sparkle/Versions/B/XPCServices/Installer.xpc" \
+          "$sparkle/Versions/B/Autoupdate" \
+          "$sparkle/Versions/B/Updater.app" \
+          "$sparkle" \
+          "$app/Contents/PlugIns/DockTilePlugin.plugin"; do
+          /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime "$part"
+        done
+        /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime --entitlements macos/Ghostty.entitlements "$app"
+        /usr/bin/codesign --verify --deep --strict "$app"
+
+    - name: Check the signed app runs
+      shell: bash
+      env:
+        VERSION: ${{ steps.info.outputs.version }}
+      run: |
+        actual=$(macos/build/Release/Wisp.app/Contents/MacOS/wisp +version 2>/dev/null | awk 'NR==1 {print $2}')
+        if [ "$actual" != "$VERSION" ]; then
+          echo "built $actual, expected $VERSION" >&2
+          exit 1
+        fi
+
+    - name: Create DMG
+      shell: bash
+      env:
+        IDENTITY: "Apple Development: James Boehmer (3DY7FZUT45)"
+      run: |
+        npm install --global create-dmg
+        create-dmg --identity="$IDENTITY" macos/build/Release/Wisp.app ./ || test -f ./Wisp*.dmg
+        mv ./Wisp*.dmg ./Wisp.dmg
+
+    - name: Sign for Sparkle
+      shell: bash
+      run: |
+        printf '%s' "$SPARKLE_PRIVATE_KEY" > sparkle.key
+        sign_update -f sparkle.key Wisp.dmg > sign_update.txt
+        rm sparkle.key
+        test -s sign_update.txt
