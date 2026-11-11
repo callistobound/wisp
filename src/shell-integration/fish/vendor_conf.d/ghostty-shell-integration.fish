@@ -4,7 +4,12 @@
 
 function ghostty_restore_xdg_data_dir -d "restore the original XDG_DATA_DIR value"
     # If we don't have our own data dir then we don't need to do anything.
-    if not set -q GHOSTTY_SHELL_INTEGRATION_XDG_DIR
+    # Prefer WISP_ and fall back to GHOSTTY_.
+    if set -q WISP_SHELL_INTEGRATION_XDG_DIR
+        set --function integration_xdg_dir "$WISP_SHELL_INTEGRATION_XDG_DIR"
+    else if set -q GHOSTTY_SHELL_INTEGRATION_XDG_DIR
+        set --function integration_xdg_dir "$GHOSTTY_SHELL_INTEGRATION_XDG_DIR"
+    else
         return
     end
 
@@ -17,7 +22,7 @@ function ghostty_restore_xdg_data_dir -d "restore the original XDG_DATA_DIR valu
     set --function --path xdg_data_dirs "$XDG_DATA_DIRS"
 
     # If our data dir is in the list then remove it.
-    if set --function index (contains --index "$GHOSTTY_SHELL_INTEGRATION_XDG_DIR" $xdg_data_dirs)
+    if set --function index (contains --index "$integration_xdg_dir" $xdg_data_dirs)
         set --erase --function xdg_data_dirs[$index]
     end
 
@@ -28,6 +33,7 @@ function ghostty_restore_xdg_data_dir -d "restore the original XDG_DATA_DIR valu
         set --erase --global XDG_DATA_DIRS
     end
 
+    set --erase WISP_SHELL_INTEGRATION_XDG_DIR
     set --erase GHOSTTY_SHELL_INTEGRATION_XDG_DIR
 end
 
@@ -49,7 +55,13 @@ status --is-interactive || ghostty_exit
 function __ghostty_setup --on-event fish_prompt -d "Setup ghostty integration"
     functions -e __ghostty_setup
 
-    set --local features (string split , $GHOSTTY_SHELL_FEATURES)
+    # Prefer WISP_ variables and fall back to GHOSTTY_.
+    set --local features_env "$GHOSTTY_SHELL_FEATURES"
+    set -q WISP_SHELL_FEATURES; and set features_env "$WISP_SHELL_FEATURES"
+    set --local bin_dir "$GHOSTTY_BIN_DIR"
+    set -q WISP_BIN_DIR; and set bin_dir "$WISP_BIN_DIR"
+
+    set --local features (string split , $features_env)
 
     # Parse the fish version for feature detection.
     # Default to 0.0 if version is unavailable or malformed.
@@ -90,8 +102,8 @@ function __ghostty_setup --on-event fish_prompt -d "Setup ghostty integration"
     end
 
     # Add Ghostty binary to PATH if the path feature is enabled
-    if contains path $features; and test -n "$GHOSTTY_BIN_DIR"
-        fish_add_path --global --path --append "$GHOSTTY_BIN_DIR"
+    if contains path $features; and test -n "$bin_dir"
+        fish_add_path --global --path --append "$bin_dir"
     end
 
     # When using sudo shell integration feature, ensure $TERMINFO is set
@@ -123,14 +135,18 @@ function __ghostty_setup --on-event fish_prompt -d "Setup ghostty integration"
     #
     # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
     # feature flags into command options.
-    set -l features (string split ',' -- "$GHOSTTY_SHELL_FEATURES")
+    set -l features (string split ',' -- "$features_env")
     if contains ssh-env $features; or contains ssh-terminfo $features
         function ssh --wraps=ssh --description "SSH wrapper with Ghostty integration"
-            set -l features (string split ',' -- "$GHOSTTY_SHELL_FEATURES")
+            set -l features_env "$GHOSTTY_SHELL_FEATURES"
+            set -q WISP_SHELL_FEATURES; and set features_env "$WISP_SHELL_FEATURES"
+            set -l bin_dir "$GHOSTTY_BIN_DIR"
+            set -q WISP_BIN_DIR; and set bin_dir "$WISP_BIN_DIR"
+            set -l features (string split ',' -- "$features_env")
             set -l flags
             contains ssh-env $features; or set -a flags --forward-env=false
             contains ssh-terminfo $features; or set -a flags --terminfo=false
-            "$GHOSTTY_BIN_DIR/ghostty" +ssh $flags -- $argv
+            "$bin_dir/ghostty" +ssh $flags -- $argv
         end
     end
 

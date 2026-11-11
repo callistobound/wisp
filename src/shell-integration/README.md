@@ -23,8 +23,8 @@ This also works for older versions of Bash.
 
 ```bash
 # Ghostty shell integration for Bash. This must be at the top of your bashrc!
-if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
-    builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
+if [ -n "${WISP_RESOURCES_DIR}" ]; then
+    builtin source "${WISP_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
 fi
 ```
 
@@ -37,7 +37,7 @@ fi
 
 ### Elvish
 
-For [Elvish](https://elv.sh), `$GHOSTTY_RESOURCES_DIR/src/shell-integration`
+For [Elvish](https://elv.sh), `$WISP_RESOURCES_DIR/src/shell-integration`
 contains an `./elvish/lib/ghostty-integration.elv` file.
 
 Elvish, on startup, searches for paths defined in `XDG_DATA_DIRS`
@@ -45,7 +45,7 @@ variable for `./elvish/lib/*.elv` files and imports them. They are thus
 made available for use as modules by way of `use <filename>`.
 
 Ghostty launches Elvish, passing the environment with `XDG_DATA_DIRS` prepended
-with `$GHOSTTY_RESOURCES_DIR/src/shell-integration`. It contains
+with `$WISP_RESOURCES_DIR/src/shell-integration`. It contains
 `./elvish/lib/ghostty-integration.elv`. The user can then import it
 by `use ghostty-integration` every time after shell startup or
 autostart integration in `$XDG_CONFIG_HOME/elvish/rc.elv`,
@@ -85,9 +85,9 @@ The shell integration is automatically enabled when running Nushell in Ghostty,
 but you can also load it manually if shell integration is disabled.
 
 Note that Nushell doesn't allow sourcing not _parse-time constants_,
-so `GHOSTTY_RESOURCES_DIR` environment variable cannot be used.
+so `WISP_RESOURCES_DIR` environment variable cannot be used.
 
-Here is an example of `config.nu` with default `GHOSTTY_RESOURCES_DIR` for macOS:
+Here is an example of `config.nu` with default `WISP_RESOURCES_DIR` for macOS:
 
 ```nushell
 source /Applications/Ghostty.app/Contents/Resources/ghostty/shell-integration/nushell/vendor/autoload/ghostty.nu
@@ -108,8 +108,8 @@ loaded. In this case, the shell integration needs to be loaded manually.
 To load the Zsh shell integration manually:
 
 ```zsh
-if [[ -n $GHOSTTY_RESOURCES_DIR ]]; then
-  source "$GHOSTTY_RESOURCES_DIR"/shell-integration/zsh/ghostty-integration
+if [[ -n $WISP_RESOURCES_DIR ]]; then
+  source "$WISP_RESOURCES_DIR"/shell-integration/zsh/ghostty-integration
 fi
 ```
 

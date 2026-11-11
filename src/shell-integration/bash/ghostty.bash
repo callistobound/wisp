@@ -20,16 +20,17 @@ if [[ "$-" != *i* ]]; then builtin return; fi
 
 # When automatic shell integration is active, we were started in POSIX
 # mode and need to manually recreate the bash startup sequence.
-if [ -n "$GHOSTTY_BASH_INJECT" ]; then
+# Handoff variables prefer WISP_ and fall back to GHOSTTY_.
+if [ -n "${WISP_BASH_INJECT:-$GHOSTTY_BASH_INJECT}" ]; then
   # Store a temporary copy of our startup flags and unset these global
   # environment variables so we can safely handle reentrancy.
-  builtin declare __ghostty_bash_flags="$GHOSTTY_BASH_INJECT"
-  builtin unset ENV GHOSTTY_BASH_INJECT
+  builtin declare __ghostty_bash_flags="${WISP_BASH_INJECT:-$GHOSTTY_BASH_INJECT}"
+  builtin unset ENV WISP_BASH_INJECT GHOSTTY_BASH_INJECT
 
   # Restore an existing ENV that was replaced by the shell integration code.
-  if [[ -n "$GHOSTTY_BASH_ENV" ]]; then
-    builtin export ENV=$GHOSTTY_BASH_ENV
-    builtin unset GHOSTTY_BASH_ENV
+  if [[ -n "${WISP_BASH_ENV:-$GHOSTTY_BASH_ENV}" ]]; then
+    builtin export ENV="${WISP_BASH_ENV:-$GHOSTTY_BASH_ENV}"
+    builtin unset WISP_BASH_ENV GHOSTTY_BASH_ENV
   fi
 
   # Restore bash's default 'posix' behavior. Also reset 'inherit_errexit',
@@ -38,9 +39,9 @@ if [ -n "$GHOSTTY_BASH_INJECT" ]; then
   builtin shopt -u inherit_errexit 2>/dev/null
 
   # Unexport HISTFILE if it was set by the shell integration code.
-  if [[ -n "$GHOSTTY_BASH_UNEXPORT_HISTFILE" ]]; then
+  if [[ -n "${WISP_BASH_UNEXPORT_HISTFILE:-$GHOSTTY_BASH_UNEXPORT_HISTFILE}" ]]; then
     builtin export -n HISTFILE
-    builtin unset GHOSTTY_BASH_UNEXPORT_HISTFILE
+    builtin unset WISP_BASH_UNEXPORT_HISTFILE GHOSTTY_BASH_UNEXPORT_HISTFILE
   fi
 
   # Manually source the startup files. See INVOCATION in bash(1) and
@@ -69,25 +70,27 @@ if [ -n "$GHOSTTY_BASH_INJECT" ]; then
           break
         }
       done
-      if [[ -z "$GHOSTTY_BASH_RCFILE" ]]; then GHOSTTY_BASH_RCFILE="$HOME/.bashrc"; fi
-      [ -r "$GHOSTTY_BASH_RCFILE" ] && builtin source "$GHOSTTY_BASH_RCFILE"
+      builtin declare __ghostty_bash_rcfile="${WISP_BASH_RCFILE:-$GHOSTTY_BASH_RCFILE}"
+      if [[ -z "$__ghostty_bash_rcfile" ]]; then __ghostty_bash_rcfile="$HOME/.bashrc"; fi
+      [ -r "$__ghostty_bash_rcfile" ] && builtin source "$__ghostty_bash_rcfile"
     fi
   fi
 
   builtin unset __ghostty_rcfile
   builtin unset __ghostty_bash_flags
-  builtin unset GHOSTTY_BASH_RCFILE
+  builtin unset __ghostty_bash_rcfile
+  builtin unset WISP_BASH_RCFILE GHOSTTY_BASH_RCFILE
 fi
 
 # Add Ghostty binary to PATH if the path feature is enabled
-if [[ "$GHOSTTY_SHELL_FEATURES" == *"path"* && -n "$GHOSTTY_BIN_DIR" ]]; then
-  if [[ ":$PATH:" != *":$GHOSTTY_BIN_DIR:"* ]]; then
-    export PATH="$PATH:$GHOSTTY_BIN_DIR"
+if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"path"* && -n "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}" ]]; then
+  if [[ ":$PATH:" != *":${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}:"* ]]; then
+    export PATH="$PATH:${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}"
   fi
 fi
 
 # Sudo
-if [[ "$GHOSTTY_SHELL_FEATURES" == *"sudo"* && -n "$TERMINFO" ]]; then
+if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"sudo"* && -n "$TERMINFO" ]]; then
   # Wrap `sudo` command to ensure Ghostty terminfo is preserved.
   #
   # This approach supports wrapping a `sudo` alias, but the alias definition
@@ -118,13 +121,13 @@ fi
 #
 # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
 # feature flags into command options.
-if [[ "$GHOSTTY_SHELL_FEATURES" == *ssh-* ]]; then
+if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *ssh-* ]]; then
   function ssh() {
     builtin local -a flags
     flags=()
-    [[ "$GHOSTTY_SHELL_FEATURES" != *ssh-env* ]] && flags+=(--forward-env=false)
-    [[ "$GHOSTTY_SHELL_FEATURES" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
-    "$GHOSTTY_BIN_DIR/ghostty" +ssh "${flags[@]}" -- "$@"
+    [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-env* ]] && flags+=(--forward-env=false)
+    [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" != *ssh-terminfo* ]] && flags+=(--terminfo=false)
+    "${WISP_BIN_DIR:-$GHOSTTY_BIN_DIR}/ghostty" +ssh "${flags[@]}" -- "$@"
   }
 fi
 
@@ -158,16 +161,16 @@ function __ghostty_precmd() {
     fi
 
     # Cursor
-    if [[ "$GHOSTTY_SHELL_FEATURES" == *"cursor"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor"* ]]; then
       builtin local cursor=5  # blinking bar
-      [[ "$GHOSTTY_SHELL_FEATURES" == *"cursor:steady"* ]] && cursor=6  # steady bar
+      [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"cursor:steady"* ]] && cursor=6  # steady bar
 
       [[ "$PS1" != *"\[\e[${cursor} q\]"* ]] && PS1=$PS1"\[\e[${cursor} q\]"
       [[ "$PS0" != *'\[\e[0 q\]'* ]] && PS0=$PS0'\[\e[0 q\]' # reset
     fi
 
     # Title (working directory)
-    if [[ "$GHOSTTY_SHELL_FEATURES" == *"title"* ]]; then
+    if [[ "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
       PS1=$PS1'\[\e]2;\w\a\]'
     fi
   fi
@@ -211,7 +214,7 @@ function __ghostty_preexec() {
   PS2="$_GHOSTTY_SAVE_PS2"
 
   # Title (current command)
-  if [[ -n $cmd && "$GHOSTTY_SHELL_FEATURES" == *"title"* ]]; then
+  if [[ -n $cmd && "${WISP_SHELL_FEATURES:-$GHOSTTY_SHELL_FEATURES}" == *"title"* ]]; then
     builtin printf "\e]2;%s\a" "${cmd//[[:cntrl:]]/}"
   fi
 

@@ -23,14 +23,17 @@
 # we quote everything that can be quoted. Some aliases will still break us
 # though.
 
-# Restore the original ZDOTDIR value if GHOSTTY_ZSH_ZDOTDIR is set.
-# Otherwise, unset the ZDOTDIR that was set during shell injection.
-if [[ -n "${GHOSTTY_ZSH_ZDOTDIR+X}" ]]; then
+# Restore the original ZDOTDIR value if WISP_ZSH_ZDOTDIR (or the older
+# GHOSTTY_ZSH_ZDOTDIR) is set. Otherwise, unset the ZDOTDIR that was set
+# during shell injection.
+if [[ -n "${WISP_ZSH_ZDOTDIR+X}" ]]; then
+    'builtin' 'export' ZDOTDIR="$WISP_ZSH_ZDOTDIR"
+elif [[ -n "${GHOSTTY_ZSH_ZDOTDIR+X}" ]]; then
     'builtin' 'export' ZDOTDIR="$GHOSTTY_ZSH_ZDOTDIR"
-    'builtin' 'unset' 'GHOSTTY_ZSH_ZDOTDIR'
 else
     'builtin' 'unset' 'ZDOTDIR'
 fi
+'builtin' 'unset' 'WISP_ZSH_ZDOTDIR' 'GHOSTTY_ZSH_ZDOTDIR'
 
 # Use try-always to have the right error code.
 {

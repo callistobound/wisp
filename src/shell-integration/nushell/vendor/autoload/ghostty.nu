@@ -1,7 +1,7 @@
 # Ghostty shell integration
 export module ghostty {
   def has_feature [feature: string] {
-    $feature in ($env.GHOSTTY_SHELL_FEATURES | default "" | split row ',')
+    $feature in ($env.WISP_SHELL_FEATURES? | default $env.GHOSTTY_SHELL_FEATURES? | default "" | split row ',')
   }
 
   # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
@@ -13,7 +13,7 @@ export module ghostty {
       return
     }
 
-    let ghostty = ($env.GHOSTTY_BIN_DIR? | default "") | path join "ghostty"
+    let ghostty = ($env.WISP_BIN_DIR? | default $env.GHOSTTY_BIN_DIR? | default "") | path join "ghostty"
     mut flags = []
     if not (has_feature "ssh-env") {
       $flags = ($flags ++ ["--forward-env=false"])
@@ -47,10 +47,13 @@ export module ghostty {
   }
 }
 
-# Clean up XDG_DATA_DIRS by removing GHOSTTY_SHELL_INTEGRATION_XDG_DIR
-if 'GHOSTTY_SHELL_INTEGRATION_XDG_DIR' in $env {
+# Clean up XDG_DATA_DIRS by removing SHELL_INTEGRATION_XDG_DIR, preferring
+# WISP_ and falling back to GHOSTTY_
+if ('WISP_SHELL_INTEGRATION_XDG_DIR' in $env) or ('GHOSTTY_SHELL_INTEGRATION_XDG_DIR' in $env) {
   if 'XDG_DATA_DIRS' in $env {
-    $env.XDG_DATA_DIRS = ($env.XDG_DATA_DIRS | str replace $"($env.GHOSTTY_SHELL_INTEGRATION_XDG_DIR):" "")
+    let xdg_dir = ($env.WISP_SHELL_INTEGRATION_XDG_DIR? | default $env.GHOSTTY_SHELL_INTEGRATION_XDG_DIR?)
+    $env.XDG_DATA_DIRS = ($env.XDG_DATA_DIRS | str replace $"($xdg_dir):" "")
   }
-  hide-env GHOSTTY_SHELL_INTEGRATION_XDG_DIR
+  if 'WISP_SHELL_INTEGRATION_XDG_DIR' in $env { hide-env WISP_SHELL_INTEGRATION_XDG_DIR }
+  if 'GHOSTTY_SHELL_INTEGRATION_XDG_DIR' in $env { hide-env GHOSTTY_SHELL_INTEGRATION_XDG_DIR }
 }

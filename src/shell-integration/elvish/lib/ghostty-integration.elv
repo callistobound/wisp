@@ -2,14 +2,28 @@
   use platform
   use str
 
-  # Clean up XDG_DATA_DIRS by removing GHOSTTY_SHELL_INTEGRATION_XDG_DIR
-  if (and (has-env GHOSTTY_SHELL_INTEGRATION_XDG_DIR) (has-env XDG_DATA_DIRS)) {
-    set-env XDG_DATA_DIRS (str:replace $E:GHOSTTY_SHELL_INTEGRATION_XDG_DIR":" "" $E:XDG_DATA_DIRS)
+  # Read WISP_<suffix>, falling back to GHOSTTY_<suffix>, else ""
+  fn wisp-env {|suffix|
+    if (has-env WISP_$suffix) {
+      get-env WISP_$suffix
+    } elif (has-env GHOSTTY_$suffix) {
+      get-env GHOSTTY_$suffix
+    } else {
+      put ""
+    }
+  }
+
+  # Clean up XDG_DATA_DIRS by removing SHELL_INTEGRATION_XDG_DIR
+  var xdg-dir = (wisp-env SHELL_INTEGRATION_XDG_DIR)
+  if (and (not-eq $xdg-dir "") (has-env XDG_DATA_DIRS)) {
+    set-env XDG_DATA_DIRS (str:replace $xdg-dir":" "" $E:XDG_DATA_DIRS)
+    unset-env WISP_SHELL_INTEGRATION_XDG_DIR
     unset-env GHOSTTY_SHELL_INTEGRATION_XDG_DIR
   }
 
   # List of enabled shell integration features
-  var features = [(str:split ',' $E:GHOSTTY_SHELL_FEATURES)]
+  var features-env = (wisp-env SHELL_FEATURES)
+  var features = [(str:split ',' $features-env)]
 
   # State tracking for semantic prompt sequences
   # Values: 'prompt-start', 'pre-exec', 'post-exec'
@@ -81,7 +95,7 @@
   # Wrap `ssh` with `ghostty +ssh` and translate the shell-integration
   # feature flags into command options.
   fn ssh-integration {|@args|
-    var ghostty = $E:GHOSTTY_BIN_DIR/"ghostty"
+    var ghostty = (wisp-env BIN_DIR)/"ghostty"
     var flags = []
     if (not (has-value $features ssh-env)) {
       set flags = (conj $flags --forward-env=false)
@@ -100,7 +114,7 @@
   set edit:after-readline  = (conj $edit:after-readline $mark-output-start~)
   set edit:after-command   = (conj $edit:after-command $mark-output-end~)
 
-  if (str:contains $E:GHOSTTY_SHELL_FEATURES "cursor") {
+  if (str:contains $features-env "cursor") {
     var cursor = "5"    # blinking bar
     if (has-value $features cursor:steady) {
       set cursor = "6"  # steady bar
@@ -111,15 +125,16 @@
     set edit:before-readline = (conj $edit:before-readline $beam~)
     set edit:after-readline  = (conj $edit:after-readline {|_| reset })
   }
-  if (and (has-value $features path) (has-env GHOSTTY_BIN_DIR)) {
-    if (not (has-value $paths $E:GHOSTTY_BIN_DIR)) {
-        set paths = [$@paths $E:GHOSTTY_BIN_DIR]
+  var bin-dir = (wisp-env BIN_DIR)
+  if (and (has-value $features path) (not-eq $bin-dir "")) {
+    if (not (has-value $paths $bin-dir)) {
+        set paths = [$@paths $bin-dir]
     }
   }
   if (and (has-value $features sudo) (not-eq "" $E:TERMINFO) (has-external sudo)) {
     edit:add-var sudo~ $sudo-with-terminfo~
   }
-  if (and (str:contains $E:GHOSTTY_SHELL_FEATURES ssh-) (has-external ssh)) {
+  if (and (str:contains $features-env ssh-) (has-external ssh)) {
     edit:add-var ssh~ $ssh-integration~
   }
 
