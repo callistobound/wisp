@@ -2,9 +2,9 @@ import Sparkle
 import Cocoa
 
 extension UpdateDriver: SPUUpdaterDelegate {
-    /// Wisp has no appcast; upstream's would install Ghostty over it.
     func feedURLString(for updater: SPUUpdater) -> String? {
-        nil
+        guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return nil }
+        return UpdateFeed.url(for: appDelegate.ghostty.config.autoUpdateChannel)
     }
 
     /// Called when an update is scheduled to install silently,

@@ -347,9 +347,6 @@ class AppDelegate: NSObject,
         // Setup our menu
         setupMenuImages()
 
-        // Wisp has no update feed, so there's nothing to check.
-        menuCheckForUpdates?.isHidden = true
-
         // Setup signal handlers
         setupSignals()
 
