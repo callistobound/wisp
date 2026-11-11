@@ -232,6 +232,8 @@ pub fn setupFeatures(
 
     if (writer.end > 0) {
         try internal_os.wisp_env.putPublic(env, "SHELL_FEATURES", buf[0..writer.end]);
+    } else {
+        internal_os.wisp_env.remove(env, "SHELL_FEATURES");
     }
 }
 
@@ -257,6 +259,18 @@ test "setup features" {
         var env = EnvMap.init(alloc);
         defer env.deinit();
 
+        try setupFeatures(&env, std.mem.zeroes(config.ShellIntegrationFeatures), true);
+        try testing.expect(env.get("WISP_SHELL_FEATURES") == null);
+        try testing.expect(env.get("GHOSTTY_SHELL_FEATURES") == null);
+    }
+
+    // Test: all features disabled clears a stale inherited value
+    {
+        var env = EnvMap.init(alloc);
+        defer env.deinit();
+
+        try env.put("WISP_SHELL_FEATURES", "title");
+        try env.put("GHOSTTY_SHELL_FEATURES", "title");
         try setupFeatures(&env, std.mem.zeroes(config.ShellIntegrationFeatures), true);
         try testing.expect(env.get("WISP_SHELL_FEATURES") == null);
         try testing.expect(env.get("GHOSTTY_SHELL_FEATURES") == null);
@@ -306,6 +320,11 @@ fn setupBash(
     resource_dir: []const u8,
     env: *EnvMap,
 ) !?config.Command {
+    // Clear stale inherited values; the script would fall back to them.
+    inline for (.{ "BASH_ENV", "BASH_INJECT", "BASH_RCFILE", "BASH_UNEXPORT_HISTFILE" }) |suffix| {
+        internal_os.wisp_env.remove(env, suffix);
+    }
+
     var stack_fallback_buf: [4096]u8 = undefined;
     var stack_fallback: std.heap.BufferFirstAllocator = .init(&stack_fallback_buf, alloc);
     var cmd = internal_os.shell.ShellCommandBuilder.init(stack_fallback.allocator());
@@ -585,6 +604,32 @@ test "bash: ENV" {
     );
 }
 
+test "bash: stale inherited variables" {
+    const testing = std.testing;
+    var arena = ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
+    var res: TmpResourcesDir = try .init(.bash);
+    defer res.deinit();
+
+    var env = EnvMap.init(alloc);
+    defer env.deinit();
+
+    // Nothing here sets ENV, --rcfile or leaves HISTFILE unset.
+    try env.put("HISTFILE", "my_history");
+    inline for (.{ "BASH_ENV", "BASH_RCFILE", "BASH_UNEXPORT_HISTFILE" }) |suffix| {
+        try env.put("WISP_" ++ suffix, "stale");
+        try env.put("GHOSTTY_" ++ suffix, "stale");
+    }
+
+    _ = try setupBash(alloc, .{ .shell = "bash" }, res.path, &env);
+    inline for (.{ "BASH_ENV", "BASH_RCFILE", "BASH_UNEXPORT_HISTFILE" }) |suffix| {
+        try testing.expect(env.get("WISP_" ++ suffix) == null);
+        try testing.expect(env.get("GHOSTTY_" ++ suffix) == null);
+    }
+}
+
 test "bash: additional arguments" {
     const testing = std.testing;
     var arena = ArenaAllocator.init(testing.allocator);
@@ -641,6 +686,9 @@ fn setupXdgDataDirs(
     resource_dir: []const u8,
     env: *EnvMap,
 ) !bool {
+    // Clear a stale inherited value.
+    internal_os.wisp_env.remove(env, "SHELL_INTEGRATION_XDG_DIR");
+
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
 
     // Get our path to the shell integration directory.
@@ -941,6 +989,9 @@ fn setupZsh(
     resource_dir: []const u8,
     env: *EnvMap,
 ) !?config.Command {
+    // Clear a stale inherited value; .zshenv would fall back to it.
+    internal_os.wisp_env.remove(env, "ZSH_ZDOTDIR");
+
     // Preserve an existing ZDOTDIR value. We're about to overwrite it.
     if (env.get("ZDOTDIR")) |old| {
         try internal_os.wisp_env.putPublic(env, "ZSH_ZDOTDIR", old);
@@ -1007,6 +1058,28 @@ test "zsh: ZDOTDIR" {
     try testing.expectEqualStrings(res.shell_path, env.get("ZDOTDIR").?);
     try testing.expectEqualStrings("$HOME/.config/zsh", env.get("WISP_ZSH_ZDOTDIR").?);
     try testing.expectEqualStrings("$HOME/.config/zsh", env.get("GHOSTTY_ZSH_ZDOTDIR").?);
+}
+
+test "zsh: stale ZSH_ZDOTDIR" {
+    const testing = std.testing;
+
+    var arena = ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
+    var res: TmpResourcesDir = try .init(.zsh);
+    defer res.deinit();
+
+    var env = EnvMap.init(testing.allocator);
+    defer env.deinit();
+
+    try env.put("WISP_ZSH_ZDOTDIR", "stale");
+    try env.put("GHOSTTY_ZSH_ZDOTDIR", "stale");
+
+    _ = try setupZsh(alloc, .{ .shell = "zsh" }, res.path, &env);
+    try testing.expectEqualStrings(res.shell_path, env.get("ZDOTDIR").?);
+    try testing.expect(env.get("WISP_ZSH_ZDOTDIR") == null);
+    try testing.expect(env.get("GHOSTTY_ZSH_ZDOTDIR") == null);
 }
 
 test "zsh: missing resources" {

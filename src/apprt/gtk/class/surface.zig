@@ -1638,6 +1638,9 @@ pub const Surface = extern struct {
             );
         }
 
+        // Only set below when this surface is a quick terminal.
+        internal_os.wisp_env.remove(&env, "QUICK_TERMINAL");
+
         // This is a hack because it ties ourselves (optionally) to the
         // Window class. The right solution we should do is emit a signal
         // here where the handler can modify our EnvMap, but boxing the

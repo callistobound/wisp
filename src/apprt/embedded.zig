@@ -1217,6 +1217,10 @@ pub const Surface = struct {
         var env = try global.environMap();
         errdefer env.deinit();
 
+        // The host sets this per surface through env_vars, which are
+        // applied after this env.
+        internal_os.wisp_env.remove(&env, "QUICK_TERMINAL");
+
         if (comptime builtin.target.os.tag.isDarwin()) {
             if (env.get("__XCODE_BUILT_PRODUCTS_DIR_PATHS") != null) {
                 _ = env.orderedRemove("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
