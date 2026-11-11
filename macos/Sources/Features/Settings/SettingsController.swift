@@ -10,7 +10,7 @@ class SettingsController: NSWindowController, NSWindowDelegate {
     private var closedSignatures: [String: ConfigFileWatcher.Signature]?
 
     init() {
-        let window = NSWindow(
+        let window = SettingsWindow(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
@@ -100,8 +100,39 @@ class SettingsController: NSWindowController, NSWindowDelegate {
 
     // MARK: - First Responder
 
+    @IBAction func close(_ sender: Any) {
+        window?.performClose(sender)
+    }
+
+    @IBAction func closeWindow(_ sender: Any) {
+        window?.performClose(sender)
+    }
+
     // This is called when "escape" is pressed.
     @objc func cancel(_ sender: Any?) {
         window?.performClose(sender)
+    }
+}
+
+/// Sends the standard edit shortcuts to the focused field. Copy and paste are
+/// performable bindings, which aren't menu shortcuts, so the menu never does.
+final class SettingsWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if super.performKeyEquivalent(with: event) { return true }
+        guard let key = event.charactersIgnoringModifiers?.lowercased(),
+              let action = Self.editAction(key: key, modifiers: event.modifierFlags) else { return false }
+        return NSApp.sendAction(action, to: nil, from: self)
+    }
+
+    static func editAction(key: String, modifiers: NSEvent.ModifierFlags) -> Selector? {
+        switch (key, modifiers.intersection([.command, .shift, .option, .control])) {
+        case ("x", .command): #selector(NSText.cut(_:))
+        case ("c", .command): #selector(NSText.copy(_:))
+        case ("v", .command): #selector(NSText.paste(_:))
+        case ("a", .command): #selector(NSResponder.selectAll(_:))
+        case ("z", .command): Selector(("undo:"))
+        case ("z", [.command, .shift]): Selector(("redo:"))
+        default: nil
+        }
     }
 }

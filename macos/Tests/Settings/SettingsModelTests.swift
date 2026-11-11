@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Ghostty
 @testable import GhosttyKit
@@ -200,6 +200,20 @@ struct SettingsModelTests {
     @Test func modelStartsOnFontSection() throws {
         let m = try model()
         #expect(m.selectedSection == .font)
+    }
+
+    // MARK: - Window
+
+    @Test func editShortcutsMapToStandardActions() {
+        #expect(SettingsWindow.editAction(key: "v", modifiers: .command) == #selector(NSText.paste(_:)))
+        #expect(SettingsWindow.editAction(key: "c", modifiers: .command) == #selector(NSText.copy(_:)))
+        #expect(SettingsWindow.editAction(key: "x", modifiers: .command) == #selector(NSText.cut(_:)))
+        #expect(SettingsWindow.editAction(key: "a", modifiers: .command) == #selector(NSResponder.selectAll(_:)))
+        #expect(SettingsWindow.editAction(key: "z", modifiers: .command) == Selector(("undo:")))
+        #expect(SettingsWindow.editAction(key: "z", modifiers: [.command, .shift]) == Selector(("redo:")))
+        #expect(SettingsWindow.editAction(key: "v", modifiers: [.command, .shift]) == nil)
+        #expect(SettingsWindow.editAction(key: "v", modifiers: [.command, .capsLock]) == #selector(NSText.paste(_:)))
+        #expect(SettingsWindow.editAction(key: "w", modifiers: .command) == nil)
     }
 
     @Test func helpSplitsFirstParagraph() {
