@@ -1,0 +1,68 @@
+name: Wisp Release
+
+on:
+  push:
+    tags: ["v*-wisp.*"]
+
+concurrency:
+  group: wisp-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Build numbers are the commit count.
+          fetch-depth: 0
+
+      # vX.Y.Z-wisp.N builds as X.Y.Z+wisp.N.
+      - name: Version
+        id: version
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          echo "version=${v/-wisp./+wisp.}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        id: build
+        uses: ./.github/actions/wisp-macos
+        with:
+          version-string: ${{ steps.version.outputs.version }}
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+
+      # The stable feed is the latest release's appcast.xml.
+      - name: Update appcast
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+          BUILD: ${{ steps.build.outputs.build }}
+        run: |
+          gh release download -p appcast.xml -O appcast-old.xml || true
+          python3 dist/wisp/update_appcast.py \
+            --channel stable \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --commit "$(git rev-parse --short HEAD)" \
+            --url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Wisp.dmg" \
+            --signature sign_update.txt \
+            --appcast appcast-old.xml \
+            --out appcast.xml
+
+      - name: Publish
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" Wisp.dmg appcast.xml \
+            --verify-tag --latest \
+            --title "Wisp $VERSION" \
+            --notes "Wisp $VERSION, built from $GITHUB_SHA."
