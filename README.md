@@ -31,8 +31,27 @@ command, with a `ghostty` alias next to it on Linux and macOS (on Windows only
 `xterm-ghostty`, `share/ghostty` resources and shell integration for
 compatibility. Environment variables are `WISP_*`; `GHOSTTY_*` is still read as
 a fallback, and the public ones are also exported under `GHOSTTY_*`. The rest
-of this document describes upstream Ghostty, except for the crash report paths
-and commands below.
+of this document describes upstream Ghostty, except for the Wisp releases
+section and the crash report paths and commands below.
+
+## Wisp Releases
+
+macOS builds are published to
+[GitHub Releases](https://github.com/jamesboehmer/wisp/releases) and update
+themselves. Install the first one by hand (it isn't notarized, so allow it once
+in System Settings › Privacy & Security). `auto-update-channel` picks the feed:
+
+- `tip`: every push to `downstream`, versioned `X.Y.Z-downstream+<commit>`.
+- `stable`: tags `vX.Y.Z-wisp.N`, versioned `X.Y.Z+wisp.N`, where `X.Y.Z` is
+  the Ghostty release it's built on.
+
+To release, merge upstream (never rebase) and tag:
+
+```sh
+git fetch origin --tags && git merge vX.Y.Z
+git tag vX.Y.Z-wisp.N && git push wisp downstream --tags
+dist/wisp/disable-upstream-workflows.sh   # after any upstream merge
+```
 
 ### Upgrading from Ghostty
 
