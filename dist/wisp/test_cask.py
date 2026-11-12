@@ -27,6 +27,11 @@ class CaskTest(unittest.TestCase):
         self.assertIn('url "https://github.com/callistobound/wisp/releases/download/tip/Wisp.dmg"\n', rb)
         self.assertIn('conflicts_with cask: "wisp"\n', rb)
 
+    def test_auto_updates_only_with_a_version(self):
+        # Homebrew's audit: `version :latest` casks shouldn't set auto_updates.
+        self.assertNotIn("auto_updates", render("tip"))
+        self.assertIn("auto_updates true\n", render("stable", version="1.4.1-wisp.1", sha256=SHA))
+
     def test_installs_app_command_and_completions(self):
         for rb in (render("tip"), render("stable", version="1.4.1-wisp.1", sha256=SHA)):
             self.assertIn('app "Wisp.app"\n', rb)

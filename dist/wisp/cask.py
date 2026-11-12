@@ -30,8 +30,7 @@ BODY = """  name "Wisp"
   desc "Terminal emulator, a downstream fork of Ghostty"
   homepage "https://github.com/callistobound/wisp"
 
-  auto_updates true
-  conflicts_with cask: "{other}"
+{auto_updates}  conflicts_with cask: "{other}"
   depends_on macos: :ventura
 
   app "Wisp.app"
@@ -61,7 +60,9 @@ def render(channel, version=None, sha256=None):
         raise ValueError("a stable cask needs a version and a sha256")
     other = "wisp@tip" if channel == "stable" else "wisp"
     head = HEADER[channel].format(version=version, sha256=sha256, releases=RELEASES)
-    return head + BODY.format(other=other, app_id=APP_ID)
+    # Homebrew only skips upgrades for auto_updates casks with a real version.
+    auto_updates = "  auto_updates true\n" if channel == "stable" else ""
+    return head + BODY.format(other=other, app_id=APP_ID, auto_updates=auto_updates)
 
 
 def main(argv):
