@@ -16,7 +16,7 @@ permissions:
 jobs:
   tip:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       GH_TOKEN: ${{ github.token }}
       FEED_URL: https://github.com/${{ github.repository }}/releases/download/tip
