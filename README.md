@@ -11,7 +11,7 @@
     <br />
     <a href="#about">About</a>
     ·
-    <a href="https://ghostty.org/download">Download</a>
+    <a href="#install">Install</a>
     ·
     <a href="https://ghostty.org/docs">Documentation</a>
     ·
@@ -20,6 +20,20 @@
     <a href="HACKING.md">Developing</a>
   </p>
 </p>
+
+## Install
+
+On macOS, with [Homebrew](https://brew.sh):
+
+```sh
+brew trust callistobound/tap
+brew install --cask callistobound/tap/wisp       # stable
+brew install --cask callistobound/tap/wisp@tip   # every push to downstream
+```
+
+Or download `Wisp.dmg` from
+[GitHub Releases](https://github.com/callistobound/wisp/releases). Either way,
+Wisp updates itself afterwards.
 
 ## About
 
@@ -44,10 +58,7 @@ every push that changes it.
 
 Signed and notarized macOS builds are published to
 [GitHub Releases](https://github.com/callistobound/wisp/releases) and update
-themselves. Install the first one from there or with Homebrew
-(`brew trust callistobound/tap`, then
-`brew install --cask callistobound/tap/wisp@tip`, or `…/wisp` for stable).
-`auto-update-channel` picks the feed:
+themselves (see [Install](#install)). `auto-update-channel` picks the feed:
 
 - `tip`: every push to `downstream`, versioned `X.Y.Z-downstream+<commit>`.
 - `stable`: tags `vX.Y.Z-wisp.N`, versioned `X.Y.Z+wisp.N`, where `X.Y.Z` is
@@ -262,20 +273,8 @@ crash report was generated.
 > reports. A future version of Ghostty will make the contents of the crash
 > reports more easily viewable through the CLI and GUI.
 
-Crash reports end in the `.ghosttycrash` extension. The crash reports are in
-[Sentry envelope format](https://develop.sentry.dev/sdk/envelopes/). You can
-upload these to your own Sentry account to view their contents, but the format
-is also publicly documented so any other available tools can also be used.
-The `wisp +crash-report` CLI command can be used to list any crash reports.
-A future version of Ghostty will show you the contents of the crash report
-directly in the terminal.
-
-To send the crash report to the Ghostty project, you can use the following
-CLI command using the [Sentry CLI](https://docs.sentry.io/cli/installation/):
-
-```shell-session
-SENTRY_DSN=https://e914ee84fd895c4fe324afa3e53dac76@o4507352570920960.ingest.us.sentry.io/4507850923638784 sentry-cli send-envelope --raw <path to wisp crash>
-```
+Crash reports end in the `.ghosttycrash` extension. The `wisp +crash-report`
+CLI command can be used to list any crash reports.
 
 > [!WARNING]
 >
