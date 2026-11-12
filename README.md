@@ -21,6 +21,25 @@
   </p>
 </p>
 
+## How Wisp Differs From Ghostty
+
+- **A settings window (macOS).** Open it with ⌘, to browse, search and edit
+  every option. Edits go back into your config files, and each option shows
+  which file it comes from. Many options get a better control than a text box:
+  - a theme picker with previews and separate light and dark themes
+  - typeahead for themes, fonts and shells
+  - font styles, features and variation axes for the chosen font
+  - checkboxes for flag options
+  - file choosers
+  - a keybinding editor that supports `global:` shortcuts
+- **Automatic `auto/` configs.** `config-file` accepts glob patterns, and the
+  starter config ends with `config-file = ?auto/*.ghostty`. Any `*.ghostty`
+  file in `auto/` next to your config loads after the main config, in name
+  order, so its settings win. Symlink your dotfiles there, or let
+  `+list-themes` save its theme there. To use this with an existing config,
+  add that line to the end of it. The settings window lists the files in
+  `auto/` and notices when they change.
+
 ## Install
 
 On macOS, with [Homebrew](https://brew.sh):
