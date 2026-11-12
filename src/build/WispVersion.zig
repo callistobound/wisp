@@ -2,7 +2,8 @@
 const std = @import("std");
 
 /// The version for a `vX.Y.Z-wisp.N` tag, or null for any other tag.
-/// X.Y.Z must match `app`, the version in build.zig.zon.
+/// X.Y.Z can't be newer than `app`, the version in build.zig.zon, so a
+/// 1.4.1-dev tree can be released on top of Ghostty 1.4.0 but not as 1.4.1.
 pub fn fromTag(
     tag: []const u8,
     app: std.SemanticVersion,
@@ -17,14 +18,14 @@ pub fn fromTag(
     for (n) |c| if (!std.ascii.isDigit(c)) return null;
     if (v.build != null) return null;
 
-    if (v.major != app.major or v.minor != app.minor or v.patch != app.patch)
-        return error.TagVersionMismatch;
+    const release: std.SemanticVersion = .{ .major = v.major, .minor = v.minor, .patch = v.patch };
+    if (release.order(app) == .gt) return error.TagVersionMismatch;
 
     return .{ .major = v.major, .minor = v.minor, .patch = v.patch, .build = pre };
 }
 
 test "wisp tag" {
-    const app: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1, .pre = "dev" };
+    const app: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1 };
     const v = (try fromTag("v1.4.1-wisp.3", app)).?;
     try std.testing.expectEqual(@as(usize, 1), v.major);
     try std.testing.expectEqual(@as(usize, 4), v.minor);
@@ -42,7 +43,16 @@ test "other tags are not wisp tags" {
     try std.testing.expect(try fromTag("v1.4.1-wisp.x", app) == null);
 }
 
-test "wisp tag must match build.zig.zon" {
-    const app: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1 };
-    try std.testing.expectError(error.TagVersionMismatch, fromTag("v1.4.0-wisp.1", app));
+test "wisp tag can't be newer than build.zig.zon" {
+    const dev: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1, .pre = "dev" };
+    try std.testing.expectError(error.TagVersionMismatch, fromTag("v1.4.1-wisp.1", dev));
+    const release: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1 };
+    try std.testing.expectError(error.TagVersionMismatch, fromTag("v1.5.0-wisp.1", release));
+}
+
+test "wisp tag for an earlier Ghostty release" {
+    const dev: std.SemanticVersion = .{ .major = 1, .minor = 4, .patch = 1, .pre = "dev" };
+    const v = (try fromTag("v1.4.0-wisp.1", dev)).?;
+    try std.testing.expectEqual(@as(usize, 0), v.patch);
+    try std.testing.expectEqualStrings("wisp.1", v.build.?);
 }

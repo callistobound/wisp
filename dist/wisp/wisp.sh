@@ -93,13 +93,7 @@ cmd_release() {
   base=${tag#v}
   say "Newest Ghostty release: $tag"
 
-  local merged=true
-  git merge-base --is-ancestor "$tag" HEAD 2>/dev/null || merged=false
-  if [ "$merged" = true ] && [ "$(zon_version)" != "$base" ]; then
-    die "no new Ghostty release: $tag is already merged and build.zig.zon is $(zon_version)"
-  fi
-
-  if [ "$merged" = false ]; then
+  if ! git merge-base --is-ancestor "$tag" HEAD 2>/dev/null; then
     git fetch origin main "refs/tags/$tag:refs/tags/$tag"
     say "Merging $tag"
     if [ "${DRY_RUN:-}" = 1 ]; then
@@ -109,9 +103,6 @@ cmd_release() {
       git merge --no-edit "$tag"
     fi
   fi
-
-  [ "$(zon_version)" = "$base" ] ||
-    die "build.zig.zon is $(zon_version), not $base; Ghostty's $tag isn't merged cleanly"
 
   git fetch --quiet wisp 'refs/tags/*:refs/tags/*' 2>/dev/null || true
   local n=1

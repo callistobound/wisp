@@ -16,9 +16,13 @@ class ReleaseVersionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "1.5.0.*1.4.1"):
             release_version("v1.5.0-wisp.1", ZON)
 
-    def test_zon_must_be_a_release(self):
+    def test_cant_claim_an_unreleased_version(self):
         with self.assertRaisesRegex(ValueError, "1.4.1-dev"):
             release_version("v1.4.1-wisp.1", ZON.replace('"1.4.1"', '"1.4.1-dev"'))
+
+    def test_earlier_ghostty_release(self):
+        dev = ZON.replace('"1.4.1"', '"1.4.1-dev"')
+        self.assertEqual(release_version("v1.4.0-wisp.1", dev), "1.4.0+wisp.1")
 
     def test_malformed_tags(self):
         for tag in ("v1.4.1-wisp.1x", "v1.4.1-wisp.", "v1.4.1", "1.4.1-wisp.1", "v1.4-wisp.1"):

@@ -345,7 +345,7 @@ pub fn init(b: *std.Build, versions: Versions) !Config {
         // A Wisp release tag wins over any other tag on the same commit.
         for (vsn.tags) |tag| {
             const wisp = WispVersion.fromTag(tag, app_version) catch
-                @panic("wisp release tags must be vX.Y.Z-wisp.N with X.Y.Z matching build.zig.zon");
+                @panic("wisp release tags must be vX.Y.Z-wisp.N with X.Y.Z no newer than build.zig.zon");
             if (wisp) |v| break :version v;
         }
 

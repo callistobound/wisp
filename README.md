@@ -65,8 +65,9 @@ git push wisp downstream vX.Y.Z-wisp.N
 dist/wisp/disable-upstream-workflows.sh   # after any upstream merge
 ```
 
-The release workflow refuses a tag whose `X.Y.Z` doesn't match
-`build.zig.zon`.
+The release workflow refuses a tag whose `X.Y.Z` is newer than
+`build.zig.zon`: between Ghostty releases (`1.4.1-dev`), release on the last one
+(`v1.4.0-wisp.N`). `make release` does all of this.
 
 ### Upgrading from Ghostty
 
