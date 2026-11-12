@@ -42,12 +42,11 @@ every push that changes it.
 
 ## Wisp Releases
 
-macOS builds are published to
+Signed and notarized macOS builds are published to
 [GitHub Releases](https://github.com/callistobound/wisp/releases) and update
-themselves. Install the first one by hand, or with Homebrew
+themselves. Install the first one from there or with Homebrew
 (`brew trust callistobound/tap`, then
-`brew install --cask callistobound/tap/wisp@tip`, or `…/wisp` for stable). It
-isn't notarized, so allow it once in System Settings › Privacy & Security.
+`brew install --cask callistobound/tap/wisp@tip`, or `…/wisp` for stable).
 `auto-update-channel` picks the feed:
 
 - `tip`: every push to `downstream`, versioned `X.Y.Z-downstream+<commit>`.
