@@ -163,7 +163,13 @@ private struct SettingsControl: View {
             case .keybind:
                 Button("Edit in Keyboard Shortcuts") { model.select(section: .keybindings) }
 
-            case .int, .float, .string, .path, .other, .flags:
+            case .flags:
+                FlagsControl(names: option.enumValues, current: current) {
+                    _ = save(GHOSTTY_CONFIG_EDIT_SET, $0, nil)
+                }
+                .opacity(isUnset ? 0.5 : 1)
+
+            case .int, .float, .string, .path, .other:
                 HStack {
                     if let suggestions = Self.suggestions(for: option.key) {
                         SuggestionField(
