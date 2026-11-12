@@ -1,3 +1,5 @@
+include wisp.mk
+
 init:
 	@echo You probably want to run "zig build" instead.
 .PHONY: init
