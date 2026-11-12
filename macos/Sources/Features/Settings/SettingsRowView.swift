@@ -164,15 +164,50 @@ private struct SettingsControl: View {
                 Button("Edit in Keyboard Shortcuts") { model.select(section: .keybindings) }
 
             case .int, .float, .string, .path, .other, .flags:
-                TextField(option.defaults.first ?? "", text: $text)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.body.monospaced())
-                    .onSubmit(submit)
+                HStack {
+                    if let suggestions = Self.suggestions(for: option.key) {
+                        SuggestionField(
+                            text: $text, placeholder: option.defaults.first ?? "",
+                            suggestions: suggestions, onCommit: submit)
+                    } else {
+                        TextField(option.defaults.first ?? "", text: $text)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.body.monospaced())
+                            .onSubmit(submit)
+                    }
+                    if Self.choosesFile(option.key) {
+                        Button("Choose…") {
+                            Self.chooseFile { text = $0; submit() }
+                        }
+                    }
+                }
             }
         }
         .labelsHidden()
         .onAppear(perform: resetText)
         .onChange(of: option.values) { _ in resetText() }
+    }
+
+    /// Values to suggest while typing, for options with a known set.
+    static func suggestions(for key: String) -> [Suggestion]? {
+        switch key {
+        case "command", "initial-command":
+            Shells.installed.map { Suggestion(value: $0, section: nil, fontName: nil) }
+        default: nil
+        }
+    }
+
+    /// Options whose value is a file the user picks.
+    static func choosesFile(_ key: String) -> Bool {
+        ["background-image", "custom-shader"].contains(key)
+    }
+
+    private static func chooseFile(_ chosen: (String) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url { chosen(url.path) }
     }
 
     /// Unset options show their default as the placeholder.
@@ -234,6 +269,11 @@ private struct SettingsControl: View {
                     .font(.body.monospaced())
                     .onSubmit(add)
                 Button("+", action: add).disabled(newEntry.isEmpty)
+                if Self.choosesFile(option.key) {
+                    Button("Choose…") {
+                        Self.chooseFile { newEntry = $0; add() }
+                    }
+                }
             }
         }
     }
