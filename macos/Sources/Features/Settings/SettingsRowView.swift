@@ -200,8 +200,9 @@ private struct SettingsControl: View {
             }
         }
         .labelsHidden()
-        .onAppear(perform: resetText)
-        .onChange(of: option.values) { _ in resetText() }
+        .onAppear { resetText(option) }
+        // The new option, since the closure sees the view from before the change.
+        .onChange(of: option) { resetText($0) }
     }
 
     private var themeDirectories: [URL] { ThemeCatalog.directories(mainConfig: model.defaultTarget) }
@@ -235,8 +236,9 @@ private struct SettingsControl: View {
     }
 
     /// Unset options show their default as the placeholder.
-    private func resetText() {
-        text = isUnset ? "" : current
+    private func resetText(_ option: SettingsOption) {
+        let current = option.values.first ?? option.defaults.first ?? ""
+        text = option.source == .default ? "" : current
         color = Color(nsColor: NSColor(hex: current) ?? .clear)
     }
 

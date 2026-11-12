@@ -21,7 +21,7 @@ enum SettingsSource: Equatable {
 }
 
 /// One config option, copied out of the C schema.
-struct SettingsOption: Identifiable {
+struct SettingsOption: Identifiable, Equatable {
     enum Kind {
         case bool, `enum`, int, float, color, string, path, repeatable, keybind, other, flags
 
