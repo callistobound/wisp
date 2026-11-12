@@ -213,6 +213,10 @@ private struct SettingsControl: View {
             Shells.installed.map { Suggestion(value: $0, section: nil, fontName: nil) }
         case "theme":
             ThemeCatalog.names(in: themeDirectories).map { Suggestion(value: $0, section: nil, fontName: nil) }
+        case _ where key.hasPrefix("font-family"):
+            FontCatalog.families()
+        case _ where key.hasPrefix("font-style"):
+            family.map { FontCatalog.styles(family: $0).map { Suggestion(value: $0, section: nil, fontName: nil) } }
         default: nil
         }
     }
@@ -284,10 +288,14 @@ private struct SettingsControl: View {
                 .foregroundStyle(file == nil && source != .other ? .secondary : .primary)
             }
             HStack {
-                TextField("Add entry", text: $newEntry)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.body.monospaced())
-                    .onSubmit(add)
+                if let suggestions = suggestions(for: option.key) {
+                    SuggestionField(text: $newEntry, placeholder: "Add entry", suggestions: suggestions, onCommit: add)
+                } else {
+                    TextField("Add entry", text: $newEntry)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body.monospaced())
+                        .onSubmit(add)
+                }
                 Button("+", action: add).disabled(newEntry.isEmpty)
                 if Self.choosesFile(option.key) {
                     Button("Choose…") {
@@ -295,7 +303,56 @@ private struct SettingsControl: View {
                     }
                 }
             }
+            if option.key == "font-feature", let family {
+                fontFeatures(family)
+            }
+            if option.key.hasPrefix("font-variation"), let family {
+                let axes = FontCatalog.axes(family: family)
+                if !axes.isEmpty {
+                    Text(axes.map { "\($0.tag) (\($0.name)) \(Self.number($0.min))–\(Self.number($0.max))" }
+                        .joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
+    }
+
+    /// The family this font option applies to, if it's a font option.
+    private var family: String? {
+        guard option.key.hasPrefix("font-") else { return nil }
+        let values = Dictionary(model.options.filter { $0.key.hasPrefix("font-family") }.map { ($0.key, $0.values) }) { a, _ in a }
+        return FontCatalog.primaryFamily(option: option.key, values: values)
+    }
+
+    /// A checkbox per feature the family supports. Checking adds the tag to the row's
+    /// file; unchecking removes the matching entry from the file that holds it.
+    @ViewBuilder
+    private func fontFeatures(_ family: String) -> some View {
+        let features = FontCatalog.features(family: family)
+        if !features.isEmpty {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), alignment: .leading)], alignment: .leading) {
+                ForEach(features, id: \.tag) { feature in
+                    let index = option.values.firstIndex(of: feature.tag)
+                    let file = index.flatMap { entryFile(option.entrySource($0)) }
+                    Toggle("\(feature.name) (\(feature.tag))", isOn: Binding(
+                        get: { index != nil },
+                        set: { on in
+                            if on {
+                                _ = save(GHOSTTY_CONFIG_EDIT_ADD, feature.tag, nil)
+                            } else if let file {
+                                _ = save(GHOSTTY_CONFIG_EDIT_REMOVE, feature.tag, file)
+                            }
+                        }))
+                    .toggleStyle(.checkbox)
+                    .disabled(index != nil && file == nil)
+                }
+            }
+        }
+    }
+
+    private static func number(_ v: Double) -> String {
+        v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
     }
 
     private func entryFile(_ source: SettingsSource) -> String? {
