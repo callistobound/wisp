@@ -163,7 +163,7 @@ private struct SettingsControl: View {
             case .keybind:
                 Button("Edit in Keyboard Shortcuts") { model.select(section: .keybindings) }
 
-            case .int, .float, .string, .path, .other:
+            case .int, .float, .string, .path, .other, .flags:
                 TextField(option.defaults.first ?? "", text: $text)
                     .textFieldStyle(.roundedBorder)
                     .font(.body.monospaced())

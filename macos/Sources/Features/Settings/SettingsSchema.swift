@@ -23,7 +23,7 @@ enum SettingsSource: Equatable {
 /// One config option, copied out of the C schema.
 struct SettingsOption: Identifiable {
     enum Kind {
-        case bool, `enum`, int, float, color, string, path, repeatable, keybind, other
+        case bool, `enum`, int, float, color, string, path, repeatable, keybind, other, flags
 
         init(_ c: ghostty_config_kind_e) {
             switch c {
@@ -36,6 +36,7 @@ struct SettingsOption: Identifiable {
             case GHOSTTY_CONFIG_KIND_PATH: self = .path
             case GHOSTTY_CONFIG_KIND_REPEATABLE: self = .repeatable
             case GHOSTTY_CONFIG_KIND_KEYBIND: self = .keybind
+            case GHOSTTY_CONFIG_KIND_FLAGS: self = .flags
             default: self = .other
             }
         }

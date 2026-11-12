@@ -10,7 +10,18 @@ const formatter = @import("formatter.zig");
 const global = @import("../global.zig");
 const help_strings = @import("help_strings");
 
-pub const Kind = enum(c_int) { bool, @"enum", int, float, color, string, path, repeatable, keybind, other };
+pub const Kind = enum(c_int) { bool, @"enum", int, float, color, string, path, repeatable, keybind, other, flags };
+
+/// True for packed structs of only bools, written as `a,no-b,c`.
+fn isFlags(comptime T: type) bool {
+    const info = switch (@typeInfo(T)) {
+        .@"struct" => |s| s,
+        else => return false,
+    };
+    if (info.layout != .@"packed") return false;
+    for (info.field_types) |F| if (F != bool) return false;
+    return true;
+}
 
 /// True if each line for `key` adds an entry rather than replacing the value.
 pub fn isRepeatable(key: Key) bool {
@@ -59,6 +70,7 @@ pub fn kindOf(key: Key) Kind {
                 else => {},
             }
             if (T == Config.Color) return .color;
+            if (comptime isFlags(T)) return .flags;
             if (T == []const u8 or T == [:0]const u8) return .string;
             if (T == Config.Path) return .path;
             return .other;
@@ -66,17 +78,21 @@ pub fn kindOf(key: Key) Kind {
     }
 }
 
-/// Field names for enum kinds (optional unwrapped), bindable actions for
-/// keybind, else empty.
+/// Field names for enum kinds (optional unwrapped), flag names for flags,
+/// bindable actions for keybind, else empty.
 pub fn enumValues(key: Key) []const [:0]const u8 {
     @setEvalBranchQuota(10_000);
     switch (key) {
         inline else => |k| {
             const T = Unwrapped(@FieldType(Config, @tagName(k)));
             if (T == Config.Keybinds) return keybind_actions;
-            if (@typeInfo(T) != .@"enum") return &.{};
+            if (@typeInfo(T) != .@"enum" and !comptime isFlags(T)) return &.{};
             const names = comptime names: {
-                const fields = @typeInfo(T).@"enum".field_names;
+                const fields = switch (@typeInfo(T)) {
+                    .@"enum" => |e| e.field_names,
+                    .@"struct" => |s| s.field_names,
+                    else => unreachable,
+                };
                 var out: [fields.len][:0]const u8 = undefined;
                 for (fields, 0..) |f, i| out[i] = f;
                 const final = out;
@@ -348,4 +364,14 @@ test "schema: keybind actions" {
         if (std.mem.eql(u8, name, "goto_split:left")) split = true;
     }
     try testing.expect(quick and split);
+}
+
+test "schema: flags kind" {
+    const testing = std.testing;
+    try testing.expectEqual(Kind.flags, kindOf(.@"shell-integration-features"));
+    const bell = enumValues(.@"bell-features");
+    const expected = [_][]const u8{ "system", "audio", "attention", "title", "border" };
+    try testing.expectEqual(expected.len, bell.len);
+    for (expected, bell) |e, b| try testing.expectEqualStrings(e, b);
+    try testing.expect(kindOf(.@"font-size") != .flags);
 }
