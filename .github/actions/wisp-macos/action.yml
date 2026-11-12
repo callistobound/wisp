@@ -2,7 +2,8 @@ name: Build Wisp for macOS
 description: >-
   Builds, signs and packages Wisp.app as Wisp.dmg, and signs the DMG for
   Sparkle into sign_update.txt. Needs a full checkout (fetch-depth: 0) and the
-  SPARKLE_PRIVATE_KEY, MACOS_CERTIFICATE and MACOS_CERTIFICATE_PWD env vars.
+  SPARKLE_PRIVATE_KEY, MACOS_CERTIFICATE, MACOS_CERTIFICATE_PWD and the
+  APPLE_NOTARIZATION_KEY, _KEY_ID and _ISSUER env vars.
 
 inputs:
   version-string:
@@ -89,7 +90,7 @@ runs:
     - name: Codesign
       shell: bash
       env:
-        IDENTITY: "Apple Development: James Boehmer (3DY7FZUT45)"
+        IDENTITY: "Developer ID Application: Callisto Bound LLC (6D6RKQQ939)"
       run: |
         echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
         keychain_pwd=$(uuidgen)
@@ -111,9 +112,9 @@ runs:
           "$sparkle/Versions/B/Updater.app" \
           "$sparkle" \
           "$app/Contents/PlugIns/DockTilePlugin.plugin"; do
-          /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime "$part"
+          /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime --timestamp "$part"
         done
-        /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime --entitlements macos/Ghostty.entitlements "$app"
+        /usr/bin/codesign --verbose -f -s "$IDENTITY" -o runtime --timestamp --entitlements macos/Ghostty.entitlements "$app"
         /usr/bin/codesign --verify --deep --strict "$app"
 
     - name: Check the signed app runs
@@ -130,11 +131,26 @@ runs:
     - name: Create DMG
       shell: bash
       env:
-        IDENTITY: "Apple Development: James Boehmer (3DY7FZUT45)"
+        IDENTITY: "Developer ID Application: Callisto Bound LLC (6D6RKQQ939)"
       run: |
         npm install --global create-dmg
         create-dmg --identity="$IDENTITY" macos/build/Release/Wisp.app ./ || test -f ./Wisp*.dmg
         mv ./Wisp*.dmg ./Wisp.dmg
+
+    # Apple scans the DMG and returns a ticket; stapling it lets Gatekeeper
+    # accept both the DMG and the app offline. Sparkle signs the stapled DMG.
+    - name: Notarize
+      shell: bash
+      run: |
+        key=$(mktemp)
+        trap 'rm -f "$key"' EXIT
+        printf '%s\n' "$APPLE_NOTARIZATION_KEY" > "$key"
+        xcrun notarytool submit Wisp.dmg --wait \
+          --key "$key" --key-id "$APPLE_NOTARIZATION_KEY_ID" --issuer "$APPLE_NOTARIZATION_ISSUER"
+        xcrun stapler staple Wisp.dmg
+        xcrun stapler staple macos/build/Release/Wisp.app
+        spctl --assess --type open --context context:primary-signature -vv Wisp.dmg
+        spctl --assess --type execute -vv macos/build/Release/Wisp.app
 
     - name: Sign for Sparkle
       shell: bash
