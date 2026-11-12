@@ -45,13 +45,19 @@ in System Settings › Privacy & Security). `auto-update-channel` picks the feed
 - `stable`: tags `vX.Y.Z-wisp.N`, versioned `X.Y.Z+wisp.N`, where `X.Y.Z` is
   the Ghostty release it's built on.
 
-To release, merge upstream (never rebase) and tag:
+To release, merge Ghostty's release (never rebase), then push one tag. Fetch
+and push tags by name: Ghostty and Wisp each have a different `tip` tag.
 
 ```sh
-git fetch origin --tags && git merge vX.Y.Z
-git tag vX.Y.Z-wisp.N && git push wisp downstream --tags
+git fetch origin main 'refs/tags/vX.Y.Z:refs/tags/vX.Y.Z'
+git merge vX.Y.Z
+git tag -m "Wisp X.Y.Z+wisp.N" vX.Y.Z-wisp.N
+git push wisp downstream vX.Y.Z-wisp.N
 dist/wisp/disable-upstream-workflows.sh   # after any upstream merge
 ```
+
+The release workflow refuses a tag whose `X.Y.Z` doesn't match
+`build.zig.zon`.
 
 ### Upgrading from Ghostty
 
