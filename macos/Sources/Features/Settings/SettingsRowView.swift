@@ -128,6 +128,7 @@ private struct SettingsControl: View {
     @State private var newEntry = ""
     @State private var color = Color.clear
     @State private var colorWrite = Debounce()
+    @State private var choosingTheme = false
 
     private var isUnset: Bool { option.source == .default }
     private var current: String { option.values.first ?? option.defaults.first ?? "" }
@@ -171,7 +172,7 @@ private struct SettingsControl: View {
 
             case .int, .float, .string, .path, .other:
                 HStack {
-                    if let suggestions = Self.suggestions(for: option.key) {
+                    if let suggestions = suggestions(for: option.key) {
                         SuggestionField(
                             text: $text, placeholder: option.defaults.first ?? "",
                             suggestions: suggestions, onCommit: submit)
@@ -186,6 +187,15 @@ private struct SettingsControl: View {
                             Self.chooseFile { text = $0; submit() }
                         }
                     }
+                    if option.key == "theme" {
+                        Button("Choose…") { choosingTheme = true }
+                            .sheet(isPresented: $choosingTheme) {
+                                ThemePicker(current: current, directories: themeDirectories) {
+                                    text = $0
+                                    _ = save(GHOSTTY_CONFIG_EDIT_SET, $0, nil)
+                                }
+                            }
+                    }
                 }
             }
         }
@@ -194,11 +204,15 @@ private struct SettingsControl: View {
         .onChange(of: option.values) { _ in resetText() }
     }
 
+    private var themeDirectories: [URL] { ThemeCatalog.directories(mainConfig: model.defaultTarget) }
+
     /// Values to suggest while typing, for options with a known set.
-    static func suggestions(for key: String) -> [Suggestion]? {
+    private func suggestions(for key: String) -> [Suggestion]? {
         switch key {
         case "command", "initial-command":
             Shells.installed.map { Suggestion(value: $0, section: nil, fontName: nil) }
+        case "theme":
+            ThemeCatalog.names(in: themeDirectories).map { Suggestion(value: $0, section: nil, fontName: nil) }
         default: nil
         }
     }
