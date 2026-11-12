@@ -71,15 +71,19 @@ jobs:
               - '!.gitignore'
               - '!.swiftlint.yml'
               - '!typos.toml'
-            release:
+            # One pattern per filter: with "every", a file must match all of
+            # a filter's patterns.
+            workflow:
               - '.github/workflows/wisp-tip.yml'
+            action:
               - '.github/actions/wisp-macos/**'
 
       - name: Determine skip
         id: skip
         run: |
           if [ "${{ steps.changes.outputs.build }}" = "false" ] &&
-            [ "${{ steps.changes.outputs.release }}" = "false" ]; then
+            [ "${{ steps.changes.outputs.workflow }}" = "false" ] &&
+            [ "${{ steps.changes.outputs.action }}" = "false" ]; then
             echo "Only non-app files changed since the last tip, skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
