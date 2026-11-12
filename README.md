@@ -34,6 +34,12 @@ a fallback, and the public ones are also exported under `GHOSTTY_*`. The rest
 of this document describes upstream Ghostty, except for the Wisp releases
 section and the crash report paths and commands below.
 
+## Wisp Reference
+
+The [Wisp reference](https://callistobound.github.io/wisp/) (config options,
+keybinding actions, CLI commands) is generated from the source and published on
+every push that changes it.
+
 ## Wisp Releases
 
 macOS builds are published to

@@ -1,0 +1,77 @@
+name: Wisp Docs
+
+# Publishes the reference generated from the source (config options,
+# keybinding actions, CLI commands) to GitHub Pages.
+on:
+  push:
+    branches: [downstream]
+    paths:
+      - "src/config/**"
+      - "src/input/**"
+      - "src/cli/**"
+      - "src/build/webgen/**"
+      - "dist/wisp/docs_from_webdata.py"
+      - "dist/wisp/site/**"
+      - ".github/workflows/wisp-docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: wisp-docs
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.17.1
+
+      # Only the reference pages, not the app.
+      - name: Generate reference
+        run: |
+          zig build -Demit-webdata -Demit-exe=false -Demit-docs=false \
+            -Demit-terminfo=false -Demit-termcap=false -Demit-themes=false \
+            -Di18n=false -p webdata
+          python3 dist/wisp/docs_from_webdata.py \
+            webdata/share/ghostty/webdata dist/wisp/site/src/content/docs
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dist/wisp/site/package-lock.json
+
+      - name: Build site
+        working-directory: dist/wisp/site
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/wisp/site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
