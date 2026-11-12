@@ -24,12 +24,12 @@ jobs:
           # Build numbers are the commit count.
           fetch-depth: 0
 
-      # vX.Y.Z-wisp.N builds as X.Y.Z+wisp.N.
+      # vX.Y.Z-wisp.N builds as X.Y.Z+wisp.N, once build.zig.zon is at X.Y.Z.
       - name: Version
         id: version
         run: |
-          v=${GITHUB_REF_NAME#v}
-          echo "version=${v/-wisp./+wisp.}" >> "$GITHUB_OUTPUT"
+          version=$(python3 dist/wisp/release_version.py "$GITHUB_REF_NAME" build.zig.zon)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build
         id: build
