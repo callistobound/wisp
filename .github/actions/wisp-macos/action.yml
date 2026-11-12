@@ -133,7 +133,7 @@ runs:
       env:
         IDENTITY: "Developer ID Application: Callisto Bound LLC (6D6RKQQ939)"
       run: |
-        npm install --global create-dmg
+        npm install --global create-dmg@8.1.0
         create-dmg --identity="$IDENTITY" macos/build/Release/Wisp.app ./ || test -f ./Wisp*.dmg
         mv ./Wisp*.dmg ./Wisp.dmg
 

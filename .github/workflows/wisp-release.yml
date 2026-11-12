@@ -50,7 +50,7 @@ jobs:
           VERSION: ${{ steps.build.outputs.version }}
           BUILD: ${{ steps.build.outputs.build }}
         run: |
-          gh release download -p appcast.xml -O appcast-old.xml || true
+          dist/wisp/fetch-appcast.sh "$GITHUB_REPOSITORY" latest appcast-old.xml
           python3 dist/wisp/update_appcast.py \
             --channel stable \
             --version "$VERSION" \
@@ -65,10 +65,15 @@ jobs:
         env:
           VERSION: ${{ steps.build.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" Wisp.dmg appcast.xml \
-            --verify-tag --latest \
-            --title "Wisp $VERSION" \
-            --notes "Wisp $VERSION, built from $GITHUB_SHA."
+          # A re-run replaces the release's files instead of failing.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" Wisp.dmg appcast.xml --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" Wisp.dmg appcast.xml \
+              --verify-tag --latest \
+              --title "Wisp $VERSION" \
+              --notes "Wisp $VERSION, built from $GITHUB_SHA."
+          fi
 
       # Writes Casks/wisp.rb in callistobound/homebrew-tap. TAP_DEPLOY_KEY is a
       # deploy key with write access to that repo only.

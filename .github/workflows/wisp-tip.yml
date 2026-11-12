@@ -120,7 +120,7 @@ jobs:
           VERSION: ${{ steps.build.outputs.version }}
           BUILD: ${{ steps.build.outputs.build }}
         run: |
-          gh release download tip -p appcast.xml -O appcast-old.xml || true
+          dist/wisp/fetch-appcast.sh "$GITHUB_REPOSITORY" tip appcast-old.xml
           python3 dist/wisp/update_appcast.py \
             --channel tip \
             --version "$VERSION" \
