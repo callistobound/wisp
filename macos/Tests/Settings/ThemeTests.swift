@@ -32,6 +32,17 @@ struct ThemeTests {
         #expect(value.text == "Alabaster")
     }
 
+    @Test @MainActor func cachedNamesRefreshWhenADirectoryChanges() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try "background = #000000\n".write(to: dir.appendingPathComponent("A"), atomically: true, encoding: .utf8)
+        #expect(ThemeCatalog.cachedNames(in: [dir]) == ["A"])
+        Thread.sleep(forTimeInterval: 1.1) // directory mtimes have one-second resolution on some volumes
+        try "background = #000000\n".write(to: dir.appendingPathComponent("B"), atomically: true, encoding: .utf8)
+        #expect(ThemeCatalog.cachedNames(in: [dir]) == ["A", "B"])
+    }
+
     @Test func namesMergeDirectories() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

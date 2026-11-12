@@ -70,6 +70,19 @@ struct ThemeValue: Equatable {
 @MainActor
 enum ThemeCatalog {
     private static var cache: [URL: ThemeColors?] = [:]
+    private static var namesCache: (key: [String], names: [String])?
+
+    /// `names(in:)`, reused until a directory's modification time changes.
+    static func cachedNames(in directories: [URL]) -> [String] {
+        let key = directories.map { dir -> String in
+            let mtime = (try? FileManager.default.attributesOfItem(atPath: dir.path)[.modificationDate] as? Date)
+            return "\(dir.path)@\(mtime?.timeIntervalSince1970 ?? 0)"
+        }
+        if let namesCache, namesCache.key == key { return namesCache.names }
+        let names = names(in: directories)
+        namesCache = (key: key, names: names)
+        return names
+    }
 
     /// The bundled themes, then `themes` next to the main config (which win).
     static func directories(mainConfig: String) -> [URL] {

@@ -13,6 +13,9 @@ struct FontAxis {
 @MainActor
 enum FontCatalog {
     private static var cachedFamilies: [Suggestion]?
+    private static var cachedStyles: [String: [String]] = [:]
+    private static var cachedFeatures: [String: [(tag: String, name: String)]] = [:]
+    private static var cachedAxes: [String: [FontAxis]] = [:]
 
     /// Installed families, monospaced first, each previewed in its own face.
     static func families() -> [Suggestion] {
@@ -34,6 +37,13 @@ enum FontCatalog {
 
     /// Style names such as "Bold" or "Medium Italic".
     static func styles(family: String) -> [String] {
+        if let cached = cachedStyles[family] { return cached }
+        let styles = readStyles(family: family)
+        cachedStyles[family] = styles
+        return styles
+    }
+
+    private static func readStyles(family: String) -> [String] {
         let members = NSFontManager.shared.availableMembers(ofFontFamily: family) ?? []
         var seen = Set<String>()
         return members.compactMap { $0.count > 1 ? $0[1] as? String : nil }.filter { seen.insert($0).inserted }
@@ -41,6 +51,13 @@ enum FontCatalog {
 
     /// OpenType feature tags the family's first face supports, with readable names.
     static func features(family: String) -> [(tag: String, name: String)] {
+        if let cached = cachedFeatures[family] { return cached }
+        let features = readFeatures(family: family)
+        cachedFeatures[family] = features
+        return features
+    }
+
+    private static func readFeatures(family: String) -> [(tag: String, name: String)] {
         guard let face = firstFace(family),
               let types = CTFontCopyFeatures(face as CTFont) as? [[String: Any]] else { return [] }
         var seen = Set<String>()
@@ -58,8 +75,53 @@ enum FontCatalog {
         return result
     }
 
+    /// Features the shaper turns on unless a `font-feature` turns them off.
+    static let defaultOnFeatures: Set<String> = ["calt", "clig", "kern", "liga", "rlig"]
+
+    /// `tag`'s setting in one entry item (`feat`, `+feat`, `-feat`, `feat on|off`,
+    /// `feat=N`), or nil if the item is about another feature.
+    nonisolated private static func setting(_ item: Substring, tag: String) -> Bool? {
+        var s = item.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "\"", with: "")
+        var on = true
+        if s.hasPrefix("-") { on = false; s.removeFirst() } else if s.hasPrefix("+") { s.removeFirst() }
+        let parts = s.split(whereSeparator: { $0 == "=" || $0 == " " }).map(String.init)
+        guard parts.first == tag else { return nil }
+        if parts.count > 1 { on = on && !["0", "off"].contains(parts[1]) }
+        return on
+    }
+
+    /// Whether `tag` ends up on after `entries`; later entries win.
+    nonisolated static func featureIsOn(_ tag: String, entries: [String]) -> Bool {
+        var on = defaultOnFeatures.contains(tag)
+        for entry in entries {
+            for item in entry.split(separator: ",") {
+                if let setting = setting(item, tag: tag) { on = setting }
+            }
+        }
+        return on
+    }
+
+    /// The single-feature entries for `tag` to remove, and the entry to add, so
+    /// `tag` ends up `on`. Entries setting several features are left alone.
+    nonisolated static func featureEdit(_ tag: String, on: Bool, entries: [String]) -> (remove: [String], add: String?) {
+        let remove = entries.filter { entry in
+            let items = entry.split(separator: ",")
+            return items.count == 1 && setting(items[0], tag: tag) != nil
+        }
+        let remaining = entries.filter { !remove.contains($0) }
+        let add = featureIsOn(tag, entries: remaining) == on ? nil : (on ? tag : "-\(tag)")
+        return (remove: remove, add: add)
+    }
+
     /// Variation axes of the family's first face, e.g. `wght` 100–900.
     static func axes(family: String) -> [FontAxis] {
+        if let cached = cachedAxes[family] { return cached }
+        let axes = readAxes(family: family)
+        cachedAxes[family] = axes
+        return axes
+    }
+
+    private static func readAxes(family: String) -> [FontAxis] {
         guard let face = firstFace(family),
               let axes = CTFontCopyVariationAxes(face as CTFont) as? [[String: Any]] else { return [] }
         return axes.compactMap { axis in

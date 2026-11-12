@@ -212,7 +212,7 @@ private struct SettingsControl: View {
         case "command", "initial-command":
             Shells.installed.map { Suggestion(value: $0, section: nil, fontName: nil) }
         case "theme":
-            ThemeCatalog.names(in: themeDirectories).map { Suggestion(value: $0, section: nil, fontName: nil) }
+            ThemeCatalog.cachedNames(in: themeDirectories).map { Suggestion(value: $0, section: nil, fontName: nil) }
         case _ where key.hasPrefix("font-family"):
             FontCatalog.families()
         case _ where key.hasPrefix("font-style"):
@@ -325,30 +325,31 @@ private struct SettingsControl: View {
         return FontCatalog.primaryFamily(option: option.key, values: values)
     }
 
-    /// A checkbox per feature the family supports. Checking adds the tag to the row's
-    /// file; unchecking removes the matching entry from the file that holds it.
+    /// A checkbox per feature the family supports, showing whether it ends up on
+    /// (some are on by default). Toggling removes single-feature entries for it from
+    /// their files and adds `tag` or `-tag` to the row's file if still needed.
     @ViewBuilder
     private func fontFeatures(_ family: String) -> some View {
         let features = FontCatalog.features(family: family)
         if !features.isEmpty {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), alignment: .leading)], alignment: .leading) {
                 ForEach(features, id: \.tag) { feature in
-                    let index = option.values.firstIndex(of: feature.tag)
-                    let file = index.flatMap { entryFile(option.entrySource($0)) }
                     Toggle("\(feature.name) (\(feature.tag))", isOn: Binding(
-                        get: { index != nil },
-                        set: { on in
-                            if on {
-                                _ = save(GHOSTTY_CONFIG_EDIT_ADD, feature.tag, nil)
-                            } else if let file {
-                                _ = save(GHOSTTY_CONFIG_EDIT_REMOVE, feature.tag, file)
-                            }
-                        }))
+                        get: { FontCatalog.featureIsOn(feature.tag, entries: option.values) },
+                        set: { setFeature(feature.tag, on: $0) }))
                     .toggleStyle(.checkbox)
-                    .disabled(index != nil && file == nil)
                 }
             }
         }
+    }
+
+    private func setFeature(_ tag: String, on: Bool) {
+        let edit = FontCatalog.featureEdit(tag, on: on, entries: option.values)
+        for entry in edit.remove {
+            guard let i = option.values.firstIndex(of: entry), let file = entryFile(option.entrySource(i)) else { continue }
+            _ = save(GHOSTTY_CONFIG_EDIT_REMOVE, entry, file)
+        }
+        if let add = edit.add { _ = save(GHOSTTY_CONFIG_EDIT_ADD, add, nil) }
     }
 
     private static func number(_ v: Double) -> String {

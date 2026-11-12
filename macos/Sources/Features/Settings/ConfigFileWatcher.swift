@@ -71,7 +71,9 @@ final class ConfigFileWatcher {
         let dirs = Set(directories.map(Self.resolve))
         queue.sync {
             // Keep existing signatures so a change pending in the debounce isn't lost.
-            signatures = Dictionary(targets.map { ($0, signatures[$0] ?? Signature(path: $0)) }) { a, _ in a }
+            // Directories are targets too, so one appearing or changing counts.
+            let all = targets + Array(dirs)
+            signatures = Dictionary(all.map { ($0, signatures[$0] ?? Signature(path: $0)) }) { a, _ in a }
             self.directories = dirs
             if targets.isEmpty && dirs.isEmpty { pending?.cancel() }
             rearm()

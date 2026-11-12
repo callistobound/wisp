@@ -58,22 +58,25 @@ struct SuggestionField: NSViewRepresentable {
     }
 
     func updateNSView(_ box: NSComboBox, context: Context) {
+        let changed = context.coordinator.parent.suggestions != suggestions
         context.coordinator.parent = self
         if box.stringValue != text { box.stringValue = text }
         box.placeholderString = placeholder
-        box.reloadData()
+        if changed { box.reloadData() }
     }
 
     final class Coordinator: NSObject, NSComboBoxDataSource, NSComboBoxDelegate {
         var parent: SuggestionField
+        /// What the user typed; highlighting an item in the list doesn't change it.
+        private var query = ""
 
         init(_ parent: SuggestionField) { self.parent = parent }
 
-        /// Every suggestion when the field is empty, else the matches.
+        /// Every suggestion when nothing's typed, else the matches.
         private func items(_ box: NSComboBox) -> [Suggestion] {
-            box.stringValue.isEmpty
+            query.isEmpty
                 ? parent.suggestions
-                : Suggestion.matches(parent.suggestions, query: box.stringValue, limit: 200)
+                : Suggestion.matches(parent.suggestions, query: query, limit: 200)
         }
 
         func numberOfItems(in comboBox: NSComboBox) -> Int { items(comboBox).count }
@@ -98,16 +101,16 @@ struct SuggestionField: NSViewRepresentable {
 
         func controlTextDidChange(_ notification: Notification) {
             guard let box = notification.object as? NSComboBox else { return }
+            query = box.stringValue
             parent.text = box.stringValue
         }
 
+        /// Highlighting (arrow keys) only fills the field; Enter or a click commits.
         func comboBoxSelectionDidChange(_ notification: Notification) {
             guard let box = notification.object as? NSComboBox, box.indexOfSelectedItem >= 0 else { return }
             let list = items(box)
             guard box.indexOfSelectedItem < list.count else { return }
-            box.stringValue = list[box.indexOfSelectedItem].value
-            parent.text = box.stringValue
-            parent.onCommit()
+            parent.text = list[box.indexOfSelectedItem].value
         }
 
         @objc func commit(_ sender: NSComboBox) {

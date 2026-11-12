@@ -106,6 +106,16 @@ struct ConfigFileWatcherTests {
         _ = watcher
     }
 
+    @Test func watcherFiresWhenDirectoryAppears() async throws {
+        let dir = try tempFile().deletingLastPathComponent().appendingPathComponent("auto")
+        let counter = Counter()
+        let watcher = ConfigFileWatcher(paths: [], directories: [dir.path], debounce: 0.05) { counter.count += 1 }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try "theme = Alabaster\n".write(to: dir.appendingPathComponent("theme.ghostty"), atomically: false, encoding: .utf8)
+        #expect(try await wait { counter.count > 0 })
+        _ = watcher
+    }
+
     @Test func signaturesDetectChangesBetweenSnapshots() throws {
         let file = try tempFile()
         let missing = file.deletingLastPathComponent().appendingPathComponent("missing")
