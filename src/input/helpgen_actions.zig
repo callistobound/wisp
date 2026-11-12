@@ -47,11 +47,11 @@ pub const Format = enum {
             .markdown =>
             \\---
             \\title: Keybinding Action Reference
-            \\description: Reference of all Ghostty keybinding actions.
-            \\editOnGithubLink: https://github.com/ghostty-org/ghostty/edit/main/src/input/Binding.zig
+            \\description: Reference of all Wisp keybinding actions.
+            \\editOnGithubLink: https://github.com/callistobound/wisp/edit/downstream/src/input/Binding.zig
             \\---
             \\
-            \\This is a reference of all Ghostty keybinding actions.
+            \\This is a reference of all Wisp keybinding actions.
             \\
             \\
             ,

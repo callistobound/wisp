@@ -17,10 +17,10 @@ pub fn genActions(writer: *std.Io.Writer) !void {
     try writer.writeAll(
         \\---
         \\title: Reference
-        \\description: Reference of all Ghostty action subcommands.
-        \\editOnGithubLink: https://github.com/ghostty-org/ghostty/tree/main/src/cli
+        \\description: Reference of all Wisp action subcommands.
+        \\editOnGithubLink: https://github.com/callistobound/wisp/tree/downstream/src/cli
         \\---
-        \\Ghostty includes a number of utility actions that can be accessed as subcommands.
+        \\Wisp includes a number of utility actions that can be accessed as subcommands.
         \\Actions provide utilities to work with config, list keybinds, list fonts, demo themes,
         \\and debug.
         \\
@@ -44,8 +44,8 @@ pub fn genActions(writer: *std.Io.Writer) !void {
             }
             try writer.writeAll("\n```\n");
             switch (action) {
-                .help, .version => try writer.writeAll("ghostty --" ++ field ++ "\n"),
-                else => try writer.writeAll("ghostty +" ++ field ++ "\n"),
+                .help, .version => try writer.writeAll("wisp --" ++ field ++ "\n"),
+                else => try writer.writeAll("wisp +" ++ field ++ "\n"),
             }
             try writer.writeAll("```\n\n");
         }
