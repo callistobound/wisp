@@ -54,6 +54,7 @@ jobs:
               - '!dist/wisp/docs_from_webdata.py'
               - '!dist/wisp/test_*.py'
               - '!dist/wisp/*.sh'
+              - '!dist/wisp/cask.py'
               - '!wisp.mk'
               - '!Makefile'
               - '!README.md'

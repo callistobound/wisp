@@ -44,8 +44,10 @@ every push that changes it.
 
 macOS builds are published to
 [GitHub Releases](https://github.com/callistobound/wisp/releases) and update
-themselves. Install the first one by hand (it isn't notarized, so allow it once
-in System Settings › Privacy & Security). `auto-update-channel` picks the feed:
+themselves. Install the first one by hand, or with Homebrew
+(`brew install --cask callistobound/tap/wisp@tip`, or `…/wisp` for stable). It
+isn't notarized, so allow it once in System Settings › Privacy & Security.
+`auto-update-channel` picks the feed:
 
 - `tip`: every push to `downstream`, versioned `X.Y.Z-downstream+<commit>`.
 - `stable`: tags `vX.Y.Z-wisp.N`, versioned `X.Y.Z+wisp.N`, where `X.Y.Z` is

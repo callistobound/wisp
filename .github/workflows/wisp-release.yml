@@ -66,3 +66,31 @@ jobs:
             --verify-tag --latest \
             --title "Wisp $VERSION" \
             --notes "Wisp $VERSION, built from $GITHUB_SHA."
+
+      # Writes Casks/wisp.rb in callistobound/homebrew-tap. TAP_DEPLOY_KEY is a
+      # deploy key with write access to that repo only.
+      - name: Update Homebrew cask
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+        run: |
+          if [ -z "$TAP_DEPLOY_KEY" ]; then
+            echo "::notice::TAP_DEPLOY_KEY isn't set; skipping the Homebrew cask"
+            exit 0
+          fi
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$TAP_DEPLOY_KEY" > "$key"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone --depth 1 git@github.com:callistobound/homebrew-tap.git tap
+          python3 dist/wisp/cask.py stable "${GITHUB_REF_NAME#v}" \
+            "$(shasum -a 256 Wisp.dmg | awk '{print $1}')" > tap/Casks/wisp.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/wisp.rb
+          if git diff --cached --quiet; then
+            echo "cask already up to date"
+          else
+            git commit -m "wisp ${GITHUB_REF_NAME#v}"
+            git push
+          fi
