@@ -2603,8 +2603,13 @@ keybind: Keybinds = .{},
 /// not exist. If you want to include a file that begins with a literal ?
 /// character, surround the file path in double quotes (").
 ///
-/// Cycles are not allowed. If a cycle is detected, an error will be logged and
-/// the configuration file will be ignored.
+/// The file name may be a pattern, where `*` matches any run of characters and
+/// `?` one character, to load every matching file in that directory in name
+/// order, e.g. `config-file = ?auto/*.ghostty`. With the leading `?`, no
+/// matches is not an error.
+///
+/// Each file loads once, however many times or through whatever symlinks it's
+/// named; later mentions are skipped.
 ///
 /// Configuration files are loaded after the configuration they're defined
 /// within in the order they're defined. **THIS IS A VERY SUBTLE BUT IMPORTANT
@@ -4528,7 +4533,7 @@ pub fn loadRecursiveFiles(self: *Config, alloc_gpa: Allocator) !void {
     if (self.@"config-file".value.items.len == 0) return;
     const arena_alloc = self._arena.?.allocator();
 
-    // Keeps track of loaded files to prevent cycles.
+    // Real paths of loaded files, so each loads once.
     var loaded = std.StringHashMap(void).init(alloc_gpa);
     defer loaded.deinit();
 
@@ -4567,57 +4572,11 @@ pub fn loadRecursiveFiles(self: *Config, alloc_gpa: Allocator) !void {
         // they're fixed up after each load.
         assert(std.fs.path.isAbsolute(path));
 
-        // We must only load a unique file once
-        if (try loaded.fetchPut(path, {}) != null) {
-            const diag: cli.Diagnostic = .{
-                .message = try arena_alloc.printSentinel(
-                    "config-file {s}: cycle detected",
-                    .{path},
-                    0,
-                ),
-            };
-
-            try self._diagnostics.append(arena_alloc, diag);
-            try self._replay_steps.append(arena_alloc, .{ .diagnostic = diag });
-            continue;
+        if (isGlob(std.fs.path.basename(path))) {
+            try self.loadIncludeGlob(arena_alloc, &loaded, path, optional);
+        } else {
+            try self.loadInclude(arena_alloc, &loaded, path, optional);
         }
-
-        var file = std.Io.Dir.openFileAbsolute(global.io(), path, .{}) catch |err| {
-            if (err != error.FileNotFound or !optional) {
-                const diag: cli.Diagnostic = .{
-                    .message = try arena_alloc.printSentinel(
-                        "error opening config-file {s}: {}",
-                        .{ path, err },
-                        0,
-                    ),
-                };
-
-                try self._diagnostics.append(arena_alloc, diag);
-                try self._replay_steps.append(arena_alloc, .{ .diagnostic = diag });
-            }
-            continue;
-        };
-        defer file.close(global.io());
-
-        const stat = try file.stat(global.io());
-        switch (stat.kind) {
-            .file => {},
-            else => |kind| {
-                const diag: cli.Diagnostic = .{
-                    .message = try arena_alloc.printSentinel(
-                        "config-file {s}: not reading because file type is {s}",
-                        .{ path, @tagName(kind) },
-                        0,
-                    ),
-                };
-
-                try self._diagnostics.append(arena_alloc, diag);
-                try self._replay_steps.append(arena_alloc, .{ .diagnostic = diag });
-                continue;
-            },
-        }
-
-        try self.loadFsFile(arena_alloc, &file, path);
     }
 
     // If we have a suffix, add that back.
@@ -4627,6 +4586,105 @@ pub fn loadRecursiveFiles(self: *Config, alloc_gpa: Allocator) !void {
             replay_suffix.items,
         );
     }
+}
+
+fn isGlob(name: []const u8) bool {
+    return std.mem.indexOfAny(u8, name, "*?") != null;
+}
+
+/// Matches `name` against `pattern`, where `*` is any run and `?` one byte.
+fn globMatch(pattern: []const u8, name: []const u8) bool {
+    if (pattern.len == 0) return name.len == 0;
+    return switch (pattern[0]) {
+        '*' => globMatch(pattern[1..], name) or
+            (name.len > 0 and globMatch(pattern, name[1..])),
+        '?' => name.len > 0 and globMatch(pattern[1..], name[1..]),
+        else => |ch| name.len > 0 and name[0] == ch and globMatch(pattern[1..], name[1..]),
+    };
+}
+
+fn includeDiagnostic(self: *Config, alloc: Allocator, comptime fmt: []const u8, args: anytype) !void {
+    const diag: cli.Diagnostic = .{ .message = try alloc.printSentinel(fmt, args, 0) };
+    try self._diagnostics.append(alloc, diag);
+    try self._replay_steps.append(alloc, .{ .diagnostic = diag });
+}
+
+/// Loads the files matching a pattern's last component, in name order.
+/// Directories are skipped; anything else that fails to open is reported.
+fn loadIncludeGlob(
+    self: *Config,
+    alloc: Allocator,
+    loaded: *std.StringHashMap(void),
+    path: [:0]const u8,
+    optional: bool,
+) !void {
+    const io = global.io();
+    const dir_path = std.fs.path.dirname(path) orelse return;
+    const pattern = std.fs.path.basename(path);
+
+    var names: std.ArrayList([]const u8) = .empty;
+    if (std.Io.Dir.openDirAbsolute(io, dir_path, .{ .iterate = true })) |dir| {
+        var d = dir;
+        defer d.close(io);
+        var it = d.iterate();
+        while (try it.next(io)) |entry| {
+            if (!globMatch(pattern, entry.name)) continue;
+            const stat = d.statFile(io, entry.name, .{}) catch null;
+            if (stat) |st| if (st.kind == .directory) continue;
+            try names.append(alloc, try alloc.dupe(u8, entry.name));
+        }
+    } else |err| switch (err) {
+        error.FileNotFound => {},
+        else => return self.includeDiagnostic(alloc, "error opening config-file {s}: {}", .{ path, err }),
+    }
+
+    if (names.items.len == 0) {
+        if (!optional) try self.includeDiagnostic(alloc, "config-file {s}: no files match", .{path});
+        return;
+    }
+
+    std.mem.sortUnstable([]const u8, names.items, {}, struct {
+        fn lessThan(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.order(u8, a, b) == .lt;
+        }
+    }.lessThan);
+    for (names.items) |name| {
+        const match = try std.fs.path.joinZ(alloc, &.{ dir_path, name });
+        try self.loadInclude(alloc, loaded, match, false);
+    }
+}
+
+/// Loads one included file. A file is identified by its real path, so it
+/// loads once however many times (or through whatever symlinks) it's named.
+fn loadInclude(
+    self: *Config,
+    alloc: Allocator,
+    loaded: *std.StringHashMap(void),
+    path: [:0]const u8,
+    optional: bool,
+) !void {
+    const io = global.io();
+    const key: []const u8 = std.Io.Dir.cwd().realPathFileAlloc(io, path, alloc) catch path;
+    if (try loaded.fetchPut(key, {}) != null) return;
+
+    var file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch |err| {
+        if (err != error.FileNotFound or !optional) {
+            try self.includeDiagnostic(alloc, "error opening config-file {s}: {}", .{ path, err });
+        }
+        return;
+    };
+    defer file.close(io);
+
+    const stat = try file.stat(io);
+    if (stat.kind != .file) {
+        return self.includeDiagnostic(
+            alloc,
+            "config-file {s}: not reading because file type is {s}",
+            .{ path, @tagName(stat.kind) },
+        );
+    }
+
+    try self.loadFsFile(alloc, &file, path);
 }
 
 /// Get the arena allocator associated with the configuration.
@@ -11874,4 +11932,157 @@ test "source: survives changeConditionalState and clone" {
     try testing.expectEqualStrings(config_path, fs.file.path);
     try testing.expectEqual(@as(usize, 2), fs.file.line);
     try testing.expectEqualStrings(dark, cfg_clone.sourceOf(.background).?.theme.path);
+}
+
+/// Loads `main` (written as config.ghostty in a temp dir laid out by `setup`)
+/// with its config-file includes. The caller deinits the config.
+fn testIncludes(
+    alloc: Allocator,
+    main: []const u8,
+    setup: *const fn (std.Io.Dir) anyerror!void,
+) !struct { cfg: Config, dir: [:0]u8, tmp: std.testing.TmpDir } {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    errdefer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "config.ghostty", .data = main });
+    try setup(tmp.dir);
+    const dir = try tmp.dir.realPathFileAlloc(io, ".", alloc);
+    errdefer alloc.free(dir);
+    const path = try std.fs.path.join(alloc, &.{ dir, "config.ghostty" });
+    defer alloc.free(path);
+
+    var cfg = try Config.default(alloc);
+    errdefer cfg.deinit();
+    try cfg.loadFile(alloc, path);
+    try cfg.loadRecursiveFiles(alloc);
+    try cfg.finalize();
+    return .{ .cfg = cfg, .dir = dir, .tmp = tmp };
+}
+
+fn testWrite(dir: std.Io.Dir, path: []const u8, data: []const u8) !void {
+    if (std.fs.path.dirname(path)) |d| try dir.createDirPath(std.testing.io, d);
+    try dir.writeFile(std.testing.io, .{ .sub_path = path, .data = data });
+}
+
+test "config-file glob loads matches in name order" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "font-size = 10\nconfig-file = ?auto/*.ghostty\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try testWrite(d, "auto/b.ghostty", "font-size = 12\n");
+            try testWrite(d, "auto/a.ghostty", "font-size = 11\n");
+            try testWrite(d, "auto/c.txt", "font-size = 13\n");
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+
+    try std.testing.expectEqual(@as(f32, 12), t.cfg.@"font-size");
+    try std.testing.expectEqual(@as(usize, 0), t.cfg._diagnostics.items().len);
+    const files = t.cfg.loadedFiles();
+    try std.testing.expectEqual(@as(usize, 3), files.len);
+    try std.testing.expect(std.mem.endsWith(u8, files[1], "auto/a.ghostty"));
+    try std.testing.expect(std.mem.endsWith(u8, files[2], "auto/b.ghostty"));
+}
+
+test "config-file optional glob with no matches" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = ?missing/*.ghostty\nconfig-file = ?auto/*.none\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try testWrite(d, "auto/a.ghostty", "font-size = 11\n");
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    try std.testing.expectEqual(@as(usize, 0), t.cfg._diagnostics.items().len);
+}
+
+test "config-file required glob with no matches" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = auto/*.none\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try testWrite(d, "auto/a.ghostty", "font-size = 11\n");
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    const diags = t.cfg._diagnostics.items();
+    try std.testing.expectEqual(@as(usize, 1), diags.len);
+    try std.testing.expect(std.mem.indexOf(u8, diags[0].message, "auto/*.none") != null);
+}
+
+test "config-file glob reports a dangling symlink" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = ?auto/*.ghostty\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try testWrite(d, "auto/a.ghostty", "font-size = 11\n");
+            try d.symLink(std.testing.io, "../gone.ghostty", "auto/b.ghostty", .{});
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    try std.testing.expectEqual(@as(f32, 11), t.cfg.@"font-size");
+    const diags = t.cfg._diagnostics.items();
+    try std.testing.expectEqual(@as(usize, 1), diags.len);
+    try std.testing.expect(std.mem.indexOf(u8, diags[0].message, "b.ghostty") != null);
+}
+
+test "config-file glob ignores directories" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = ?auto/*.ghostty\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try d.createDirPath(std.testing.io, "auto/d.ghostty");
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    try std.testing.expectEqual(@as(usize, 0), t.cfg._diagnostics.items().len);
+}
+
+test "config-file repeat loads once" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = ?auto/*.ghostty\nconfig-file = real.ghostty\n", struct {
+        fn f(d: std.Io.Dir) !void {
+            try testWrite(d, "real.ghostty", "keybind = ctrl+a=new_tab\n");
+            try d.createDirPath(std.testing.io, "auto");
+            try d.symLink(std.testing.io, "../real.ghostty", "auto/x.ghostty", .{});
+        }
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    try std.testing.expectEqual(@as(usize, 0), t.cfg._diagnostics.items().len);
+
+    var count: usize = 0;
+    var it = t.cfg.keybind.set.bindings.iterator();
+    while (it.next()) |entry| switch (entry.value_ptr.*) {
+        .leaf => |leaf| if (leaf.action == .new_tab and
+            entry.key_ptr.key == .unicode and entry.key_ptr.key.unicode == 'a' and
+            entry.key_ptr.mods.ctrl)
+        {
+            count += 1;
+        },
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), count);
+
+    const files = t.cfg.loadedFiles();
+    try std.testing.expectEqual(@as(usize, 2), files.len);
+    try std.testing.expect(std.mem.endsWith(u8, files[1], "auto/x.ghostty"));
+}
+
+test "config-file self include is skipped" {
+    const alloc = std.testing.allocator;
+    var t = try testIncludes(alloc, "config-file = config.ghostty\nfont-size = 14\n", struct {
+        fn f(_: std.Io.Dir) !void {}
+    }.f);
+    defer t.tmp.cleanup();
+    defer alloc.free(t.dir);
+    defer t.cfg.deinit();
+    try std.testing.expectEqual(@as(usize, 0), t.cfg._diagnostics.items().len);
+    try std.testing.expectEqual(@as(f32, 14), t.cfg.@"font-size");
 }

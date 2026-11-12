@@ -50,3 +50,6 @@
 # # which is explained in the docs for that config option.
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
+
+# Files in auto/, such as the theme `+list-themes` saves, load after this one.
+config-file = ?auto/*.ghostty
