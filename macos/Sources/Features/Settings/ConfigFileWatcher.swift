@@ -2,6 +2,7 @@ import Foundation
 
 /// Watches config files and their parent directories, calling `onChange` on the main
 /// queue after a debounce. Directories are watched because atomic saves swap inodes.
+/// Any change in `directories` (where `config-file` patterns match) counts too.
 final class ConfigFileWatcher {
     struct Signature: Equatable {
         let dev: dev_t
@@ -37,15 +38,16 @@ final class ConfigFileWatcher {
     // Only touched on `queue`.
     private var signatures: [String: Signature?] = [:]
     private var watches: [String: Watch] = [:]
+    private var directories: Set<String> = []
     private var dirty = false
     /// Set by `rebaseline`; until the next fire, only signature changes count.
     private var quiet = false
     private var pending: DispatchWorkItem?
 
-    init(paths: [String], debounce: TimeInterval = 0.2, onChange: @escaping () -> Void) {
+    init(paths: [String], directories: [String] = [], debounce: TimeInterval = 0.2, onChange: @escaping () -> Void) {
         self.debounce = debounce
         self.onChange = onChange
-        update(paths: paths)
+        update(paths: paths, directories: directories)
     }
 
     deinit {
@@ -64,12 +66,14 @@ final class ConfigFileWatcher {
         URL(fileURLWithPath: path).resolvingSymlinksInPath().path
     }
 
-    func update(paths: [String]) {
+    func update(paths: [String], directories: [String] = []) {
         let targets = paths.map(Self.resolve)
+        let dirs = Set(directories.map(Self.resolve))
         queue.sync {
             // Keep existing signatures so a change pending in the debounce isn't lost.
             signatures = Dictionary(targets.map { ($0, signatures[$0] ?? Signature(path: $0)) }) { a, _ in a }
-            if targets.isEmpty { pending?.cancel() }
+            self.directories = dirs
+            if targets.isEmpty && dirs.isEmpty { pending?.cancel() }
             rearm()
         }
     }
@@ -88,7 +92,7 @@ final class ConfigFileWatcher {
     /// Watches every target and parent directory, reopening any whose inode was replaced.
     private func rearm() {
         let targets = Set(signatures.keys)
-        let paths = targets.union(targets.map { ($0 as NSString).deletingLastPathComponent })
+        let paths = targets.union(targets.map { ($0 as NSString).deletingLastPathComponent }).union(directories)
         for (path, watch) in watches {
             let current = Signature(path: path)
             if !paths.contains(path) || current?.dev != watch.dev || current?.ino != watch.ino {
@@ -103,7 +107,7 @@ final class ConfigFileWatcher {
             guard fd >= 0 else { continue }
             let source = DispatchSource.makeFileSystemObjectSource(
                 fileDescriptor: fd, eventMask: [.write, .delete, .rename, .extend], queue: queue)
-            let isFile = targets.contains(path)
+            let isFile = targets.contains(path) || directories.contains(path)
             source.setEventHandler { [weak self] in self?.handleEvent(file: isFile) }
             source.setCancelHandler { close(fd) }
             source.resume()

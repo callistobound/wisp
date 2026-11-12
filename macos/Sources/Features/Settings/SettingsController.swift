@@ -73,7 +73,9 @@ class SettingsController: NSWindowController, NSWindowDelegate {
     /// Reloads the app config when a config file changes while the window is open.
     private func startWatching() {
         guard watcher == nil, let model, let ghostty = (NSApp.delegate as? AppDelegate)?.ghostty else { return }
-        watcher = ConfigFileWatcher(paths: model.files) { [weak ghostty] in ghostty?.reloadConfig() }
+        watcher = ConfigFileWatcher(paths: model.files, directories: model.watchDirectories) { [weak ghostty] in
+            ghostty?.reloadConfig()
+        }
 
         // Files edited while closed; the reload refreshes the model via the config change.
         if let closedSignatures, closedSignatures != ConfigFileWatcher.signatures(paths: model.files) {
@@ -88,7 +90,7 @@ class SettingsController: NSWindowController, NSWindowDelegate {
               let config = notification.userInfo?[Notification.Name.GhosttyConfigChangeKey] as? Ghostty.Config,
               let model else { return }
         model.reload(config: config)
-        watcher?.update(paths: model.files)
+        watcher?.update(paths: model.files, directories: model.watchDirectories)
     }
 
     // MARK: - NSWindowDelegate

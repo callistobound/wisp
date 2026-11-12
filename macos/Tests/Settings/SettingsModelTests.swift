@@ -111,6 +111,28 @@ struct SettingsModelTests {
         #expect(keys.contains("keybind"))
     }
 
+    @Test func watchDirectoriesFromPatterns() throws {
+        let includes = SettingsOption(
+            key: "config-file", kind: .repeatable, help: "", enumValues: [],
+            values: ["?/c/auto/*.ghostty", "/c/extra.ghostty"], defaults: [], source: .default, entrySources: [])
+        let m = try model(options: [includes])
+        #expect(m.watchDirectories == ["/c/auto"])
+    }
+
+    @Test func globbedFilesAreListed() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("auto"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let auto = dir.appendingPathComponent("auto/theme.ghostty").path
+        try "font-size = 13\n".write(toFile: auto, atomically: true, encoding: .utf8)
+
+        let config = try TemporaryConfig("config-file = ?\(dir.path)/auto/*.ghostty\n")
+        let m = SettingsModel(config: config, defaultTarget: config.temporaryFile.path())
+        #expect(m.files.contains(auto))
+        #expect(m.options.first { $0.key == "font-size" }?.source == .file(path: auto, line: 1))
+        #expect(m.watchDirectories == [dir.appendingPathComponent("auto").path])
+    }
+
     @Test func sidebarPickClearsSearch() throws {
         let config = try TemporaryConfig("copy-on-select = clipboard\n")
         let path = config.temporaryFile.path()

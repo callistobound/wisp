@@ -26,6 +26,19 @@ final class SettingsModel: ObservableObject {
 
     @Published var options: [SettingsOption] = []
     @Published var files: [String] = []
+
+    /// Directories of `config-file` patterns, watched so new matches load.
+    var watchDirectories: [String] {
+        guard let includes = options.first(where: { $0.key == "config-file" }) else { return [] }
+        var seen = Set<String>()
+        return includes.values.compactMap { value -> String? in
+            let path = value.hasPrefix("?") ? String(value.dropFirst()) : value
+            let name = (path as NSString).lastPathComponent
+            guard name.contains("*") || name.contains("?") else { return nil }
+            let dir = (path as NSString).deletingLastPathComponent
+            return seen.insert(dir).inserted ? dir : nil
+        }
+    }
     @Published var search: String = ""
     @Published var selectedSection: SettingsSection? = .font
     @Published var selectedFile: String?
