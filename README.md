@@ -45,9 +45,15 @@
 On macOS, with [Homebrew](https://brew.sh):
 
 ```sh
+brew tap callistobound/tap
 brew trust callistobound/tap
-brew install --cask callistobound/tap/wisp       # stable
-brew install --cask callistobound/tap/wisp@tip   # every push to downstream
+brew install --cask callistobound/tap/wisp
+```
+
+For tip builds (every push to `downstream`) instead of stable releases:
+
+```sh
+brew install --cask callistobound/tap/wisp@tip
 ```
 
 Or download `Wisp.dmg` from
