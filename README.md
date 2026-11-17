@@ -21,6 +21,10 @@
   </p>
 </p>
 
+<p align="center">
+  <img src="images/wisp/settings.png" alt="The Wisp settings window" width="800">
+</p>
+
 ## How Wisp Differs From Ghostty
 
 - **A settings window (macOS).** Open it with ⌘, to browse, search and edit
@@ -32,6 +36,9 @@
   - checkboxes for flag options
   - file choosers
   - a keybinding editor that supports `global:` shortcuts
+
+  <img src="images/wisp/theme-picker.png" alt="The theme picker" width="600">
+
 - **Automatic `auto/` configs.** `config-file` accepts glob patterns, and the
   starter config ends with `config-file = ?auto/*.ghostty`. Any `*.ghostty`
   file in `auto/` next to your config loads after the main config, in name
